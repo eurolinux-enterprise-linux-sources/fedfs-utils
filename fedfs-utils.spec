@@ -1,6 +1,6 @@
 Name:           fedfs-utils
-Version:        0.10.3
-Release:        2%{?dist}
+Version:        0.10.5
+Release:        0%{?dist}
 Summary:        Utilities for mounting and managing FedFS
 
 Group:          System Environment/Daemons
@@ -424,6 +424,9 @@ FedFS may support other network file system protocols in the future.
 %{_mandir}/man8/nsdb-*
 
 %changelog
+* Wed Apr  6 2016 Steve Dickson <steved@redhat.com> - 0.10.5-0
+- Updated to latest upstream release: 0.10.5 (bz 1277221)
+
 * Wed Oct 22 2014 Steve Dickson <steved@redhat.com> - 0.10.3-2
 - Reworked CFLAGS to put back execshield (bz 983257)
 

@@ -376,7 +376,7 @@ admin_delete_rpc(admin_t host, rpcproc_t procedure, FedFsPath *arg)
 
 		memset((char *)&result, 0, sizeof(result));
 		host->ad_rpc_status = clnt_call(host->ad_client, procedure,
-				(xdrproc_t)xdr_FedFsPath, (caddr_t)&arg,
+				(xdrproc_t)xdr_FedFsPath, (caddr_t)arg,
 				(xdrproc_t)xdr_FedFsStatus, (caddr_t)&result,
 				host->ad_timeout);
 
@@ -458,7 +458,7 @@ admin_lookup_rpc(admin_t host, rpcproc_t procedure,
 		memset((char *)result, 0, sizeof(*result));
 		host->ad_rpc_status = clnt_call(host->ad_client,
 				procedure,
-				(xdrproc_t)xdr_FedFsLookupArgs, (caddr_t)&arg,
+				(xdrproc_t)xdr_FedFsLookupArgs, (caddr_t)arg,
 				(xdrproc_t)xdr_FedFsLookupRes, (caddr_t)result,
 				host->ad_timeout);
 

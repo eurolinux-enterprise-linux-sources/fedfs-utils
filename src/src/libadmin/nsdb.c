@@ -250,7 +250,7 @@ admin_get_nsdb_params_rpc(admin_t host, FedFsNsdbName *arg,
 		memset((char *)result, 0, sizeof(*result));
 		host->ad_rpc_status = clnt_call(host->ad_client,
 			FEDFS_GET_NSDB_PARAMS,
-			(xdrproc_t)xdr_FedFsNsdbName, (caddr_t)&arg,
+			(xdrproc_t)xdr_FedFsNsdbName, (caddr_t)arg,
 			(xdrproc_t)xdr_FedFsGetNsdbParamsRes, (caddr_t)&result,
 			host->ad_timeout);
 

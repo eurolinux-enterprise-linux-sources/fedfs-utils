@@ -163,7 +163,7 @@ fedfs_delete_junction_host(const char *hostname, const char *nettype,
 		break;
 	default:
 		xlog(L_ERROR, "%s",
-			admin_open_perror(admin_hostname(host)));
+			admin_open_perror(hostname));
 	}
 
 	return status;

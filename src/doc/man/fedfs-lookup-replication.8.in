@@ -124,11 +124,6 @@ If this option is not specified, the default value is
 See
 .BR rpc (3t)
 for details.
-.IP "\fB\-p, \-\-path=\fIpathname\fP"
-Specifies the location on the remote server where the target FedFS replication
-resides.
-This pathname is relative to the remote server's physical root directory,
-not the remote server's NFS pseudoroot.
 .IP "\fB\-t, \-\-resolvetype=\fItype\fP"
 Specifies the desired type of resolution.  Valid values for
 .I type

@@ -27,7 +27,7 @@
 #
 
 AC_PREREQ([2.65])
-AC_INIT([fedfs-utils], [0.10.3], [fedfs-utils-devel@oss.oracle.com])
+AC_INIT([fedfs-utils], [0.10.5], [fedfs-utils-devel@oss.oracle.com])
 AC_CANONICAL_BUILD([])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])

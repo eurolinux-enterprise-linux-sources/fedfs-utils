@@ -57,7 +57,6 @@ static const struct option nsdbparams_update_longopts[] = {
 	{ "gid", 1, NULL, 'g', },
 	{ "help", 0, NULL, '?', },
 	{ "nce", 1, NULL, 'e', },
-	{ "nsdbname", 1, NULL, 'l', },
 	{ "nsdbport", 1, NULL, 'r', },
 	{ "referral", 1, NULL, 'R', },
 	{ "sectype", 1, NULL, 't', },
@@ -311,9 +310,6 @@ nsdbparams_update(const char *progname, int argc, char **argv)
 		case '?':
 			nsdbparams_update_usage(progname);
 			goto out;
-		case 'l':
-			nsdbname = optarg;
-			break;
 		case 'r':
 			if (!nsdb_parse_port_string(optarg, &nsdbport)) {
 				xlog(L_ERROR, "Bad port number: %s",

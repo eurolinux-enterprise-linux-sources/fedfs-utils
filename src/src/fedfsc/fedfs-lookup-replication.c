@@ -243,7 +243,7 @@ fedfs_lookup_replication_host(const char *hostname, const char *nettype,
 		break;
 	default:
 		xlog(L_ERROR, "%s",
-			admin_open_perror(admin_hostname(host)));
+			admin_open_perror(hostname));
 	}
 
 	return status;
@@ -282,7 +282,6 @@ main(int argc, char **argv)
 	nettype = "netpath";
 	security = "unix";
 	resolvetype = "none";
-	path = NULL;
 	while ((arg = getopt_long(argc, argv, fedfs_lookup_replication_opts,
 				fedfs_lookup_replication_longopts, NULL)) != -1) {
 		switch (arg) {
@@ -294,9 +293,6 @@ main(int argc, char **argv)
 			break;
 		case 'n':
 			nettype = optarg;
-			break;
-		case 'p':
-			path = optarg;
 			break;
 		case 's':
 			security = optarg;

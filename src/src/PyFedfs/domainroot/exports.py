@@ -24,6 +24,7 @@ try:
     import sys
     import logging as log
     import augeas
+    import uuid
 
     from PyFedfs.domainroot.parse_file import parse_file
 
@@ -63,13 +64,13 @@ def add_exports_entry(pathname):
     config.set('/files/etc/exports/dir[last()]/client[1]/option[1]',
                'ro')
     config.set('/files/etc/exports/dir[last()]/client[1]/option[2]',
-               'mp')
-    config.set('/files/etc/exports/dir[last()]/client[1]/option[3]',
                'subtree_check')
-    config.set('/files/etc/exports/dir[last()]/client[1]/option[4]',
+    config.set('/files/etc/exports/dir[last()]/client[1]/option[3]',
                'insecure')
-    config.set('/files/etc/exports/dir[last()]/client[1]/option[5]',
+    config.set('/files/etc/exports/dir[last()]/client[1]/option[4]',
                'sec=sys:none')
+    config.set('/files/etc/exports/dir[last()]/client[1]/option[5]',
+               'fsid=' + str(uuid.uuid4()))
 
     ret = EXIT_SUCCESS
     try:
