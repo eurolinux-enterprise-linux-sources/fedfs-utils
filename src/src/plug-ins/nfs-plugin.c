@@ -290,9 +290,6 @@ nfs_jp_convert_fedfs_fsl(struct fedfs_fsl *fsl, struct nfs_fsloc **fsloc)
  * @param fsls a list of FedFS fileset locations
  * @param new empty set of NFS locations to fill in
  * @return a junction status code
- *
- * If nfs_jp_convert_fedfs_fsls() returns JP_OK, the caller must free the returned
- * set of locations by calling nfs_jp_put_locations().
  */
 static enum jp_status
 nfs_jp_convert_fedfs_fsls(struct fedfs_fsl *fsls, nfs_fsloc_set_t new)
@@ -309,10 +306,8 @@ nfs_jp_convert_fedfs_fsls(struct fedfs_fsl *fsls, nfs_fsloc_set_t new)
 		enum jp_status status;
 
 		status = nfs_jp_convert_fedfs_fsl(fsl, &fsloc);
-		if (status != JP_OK) {
-			nfs_jp_put_locations(new);
+		if (status != JP_OK)
 			return status;
-		}
 
 		if (new->ns_list == NULL)
 			new->ns_list = fsloc;
@@ -379,9 +374,6 @@ nfs_jp_follow_ldap_referral(nsdb_t *host)
  * @param host an initialized NSDB host object
  * @param new empty set of NFS locations
  * @return a junction status code
- *
- * If nfs_jp_resolve_fsn() returns JP_OK, the caller must free the returned
- * set of locations by calling nfs_jp_put_locations().
  */
 static enum jp_status
 nfs_jp_resolve_fsn(const char *fsn_uuid, nsdb_t host,
@@ -492,9 +484,6 @@ out_close:
  * @param junct_path NUL-terminated C string containing POSIX path of junction
  * @param new empty set of NFS locations
  * @return a junction status code
- *
- * If nfs_jp_resolve_fedfs_junction() returns JP_OK, the caller must free
- * the returned set of locations by calling nfs_jp_put_locations().
  */
 static enum jp_status
 nfs_jp_resolve_fedfs_junction(const char *junct_path, nfs_fsloc_set_t new)

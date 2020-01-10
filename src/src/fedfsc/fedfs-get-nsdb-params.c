@@ -157,7 +157,6 @@ fedfs_get_nsdb_params_try(admin_t host, struct admin_nsdb *nsdb,
 	switch (admin_status(host)) {
 	case FEDFS_OK:
 		fedfs_get_nsdb_params_print_result(sectype, cert, certfile);
-		admin_free_cert(cert);
 		status = EXIT_SUCCESS;
 		break;
 	case FEDFS_ERR_NSDB_PARAMS:
@@ -166,6 +165,7 @@ fedfs_get_nsdb_params_try(admin_t host, struct admin_nsdb *nsdb,
 	default:
 		nsdb_print_fedfsstatus(admin_status(host));
 	}
+	admin_free_cert(cert);
 
 out:
 	return status;

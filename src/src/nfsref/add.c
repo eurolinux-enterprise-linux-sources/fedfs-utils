@@ -149,7 +149,6 @@ nfsref_add_build_fsloc(const char *server, const char *rootpath,
 
 	retval = nsdb_posix_to_path_array(rootpath, &new->nfl_rootpath);
 	if (retval != FEDFS_OK) {
-		free(new->nfl_hostname);
 		nfs_free_location(new);
 		return retval;
 	}
@@ -311,7 +310,8 @@ nfsref_add_nfs_fsl_defaults(const char *server, const char *rootpath,
 {
 	FedFsStatus retval;
 
-	/* XXX: check the server hostname length */
+	if (strlen(server) >= sizeof(new->fn_fslhost))
+		return FEDFS_ERR_NAMETOOLONG;
 	strcpy(new->fn_fslhost, server);
 	new->fn_fslport = 0;
 
@@ -374,8 +374,10 @@ nfsref_add_build_fsl(const char *fsn_uuid, const char *server,
 	strncpy(new->fl_fsnuuid, fsn_uuid, sizeof(new->fl_fsnuuid));
 
 	retval = nfsref_add_nfs_fsl_defaults(server, rootpath, &new->fl_u.fl_nfsfsl);
-	if (retval != FEDFS_OK)
+	if (retval != FEDFS_OK) {
+		nsdb_free_fedfs_fsl(new);
 		return retval;
+	}
 
 	*fsl = new;
 	return FEDFS_OK;

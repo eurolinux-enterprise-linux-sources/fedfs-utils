@@ -164,9 +164,7 @@ int main(int argc, char **argv)
 			gid = grp->gr_gid;
 			break;
 		case '?':
-			fprintf(stderr, "Version " VERSION
-					", built on %s at %s\n\n",
-					__DATE__, __TIME__);
+			fprintf(stderr, "Version " VERSION "\n\n");
 			fedfsd_usage(progname);
 			break;
 		case 'o':
@@ -230,8 +228,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	xlog(L_NOTICE, "Version " VERSION " (built %s at %s) starting",
-			__DATE__, __TIME__);
+	xlog(L_NOTICE, "Version " VERSION " starting");
 
 	if (!fedfsd_set_up_authenticators())
 		exit(EXIT_FAILURE);

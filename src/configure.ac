@@ -27,7 +27,7 @@
 #
 
 AC_PREREQ([2.65])
-AC_INIT([fedfs-utils], [0.10.0], [fedfs-utils-devel@oss.oracle.com])
+AC_INIT([fedfs-utils], [0.10.3], [fedfs-utils-devel@oss.oracle.com])
 AC_CANONICAL_BUILD([])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
@@ -141,11 +141,6 @@ AC_CHECK_LIB([ssl], [SSL_CTX_new],
 		 AC_DEFINE([HAVE_LIBSSL], [1],
 			   [Define if you have libssl])],
 		[AC_MSG_ERROR([libssl not found.])])
-AC_CHECK_LIB([attr], [fgetxattr],
-		[AC_SUBST([LIBATTR], ["-lattr"])
-		 AC_DEFINE([HAVE_LIBATTR], [1],
-			   [Define if you have libattr])],
-		[AC_MSG_ERROR([libattr not found.])])
 AC_CHECK_LIB([gssapi_krb5], [gss_acquire_cred],
 		[AC_SUBST([LIBGSSAPI_KRB5], ["-lgssapi_krb5"])
 		 AC_DEFINE([HAVE_LIBGSSAPI_KRB5], [1],

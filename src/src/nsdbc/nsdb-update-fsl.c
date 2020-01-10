@@ -157,10 +157,11 @@ main(int argc, char **argv)
 		case 'v':
 			value = optarg;
 			break;
+		case '?':
+			nsdb_update_fsl_usage(progname);
 		default:
 			fprintf(stderr, "Invalid command line "
 				"argument: %c\n", (char)arg);
-		case '?':
 			nsdb_update_fsl_usage(progname);
 		}
 	}

@@ -142,10 +142,11 @@ main(int argc, char **argv)
 				nsdb_remove_nci_usage(progname);
 			}
 			break;
+		case '?':
+			nsdb_remove_nci_usage(progname);
 		default:
 			fprintf(stderr, "Invalid command line "
 				"argument: %c\n", (char)arg);
-		case '?':
 			nsdb_remove_nci_usage(progname);
 		}
 	}

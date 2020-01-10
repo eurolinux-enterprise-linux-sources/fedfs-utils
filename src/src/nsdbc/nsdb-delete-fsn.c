@@ -153,10 +153,11 @@ main(int argc, char **argv)
 		case 'y':
 			leave_fsn = true;
 			break;
+		case '?':
+			nsdb_delete_fsn_usage(progname);
 		default:
 			fprintf(stderr, "Invalid command line "
 				"argument: %c\n", (char)arg);
-		case '?':
 			nsdb_delete_fsn_usage(progname);
 		}
 	}

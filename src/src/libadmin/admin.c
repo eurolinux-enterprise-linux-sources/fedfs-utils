@@ -315,8 +315,10 @@ admin_create(const char *hostname, const char *nettype, const char *security,
 		return err;
 
 	err = admin_open(new);
-	if (err != 0)
+	if (err != 0) {
+		admin_release(new);
 		return err;
+	}
 
 	*result = new;
 	return 0;

@@ -41,7 +41,8 @@ MISC_CMDS		= rpc.fedfsd.8 nsdbparams.8 nfsref.8
 MOUNT_CMDS		= mount.fedfs.8 fedfs-map-nfs4.8
 
 man_MANS		= $(MISC_DOCS) $(MISC_CMDS) $(PYTHON_CMDS) \
-			  $(ADMIN_CLIENT_CMDS) $(NSDB_CLIENT_CMDS)
+			  $(ADMIN_CLIENT_CMDS) $(NSDB_CLIENT_CMDS) \
+			  $(MOUNT_CMDS)
 
 
 CLEANFILES		= cscope.in.out cscope.out cscope.po.out *~

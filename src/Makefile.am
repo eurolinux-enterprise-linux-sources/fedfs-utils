@@ -35,9 +35,20 @@ DISTCLEANFILES		= Makefile.in ChangeLog fedfs-utils*.tar.gz
 ChangeLog:
 	git log > ChangeLog
 
-clean-local: doxyclean
+clean-local: doxyclean covclean
 
 dist-hook: ChangeLog
+
+# Coverity-related targets
+
+.PHONY: covbuild covclean
+
+covbuild:
+	cov-build --dir cov-int make
+	tar czvf /tmp/fedfs-utils-cov-int.tgz cov-int
+
+covclean:
+	$(RM) -rf cov-int
 
 # Doxygen-related targets
 

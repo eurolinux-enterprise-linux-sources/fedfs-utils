@@ -114,7 +114,7 @@ def ask_for_domainname(answers):
     Returns True if the interview data is good
     """
     answers['domainname'] = get_domainname()
-    print('Enter the name of the FedFS domain this NSDB will server')
+    print('Enter the name of the FedFS domain this NSDB will serve')
     if answers['domainname'] == []:
         sys.stdout.write('FedFS domain: ')
         choice = raw_input().lower()

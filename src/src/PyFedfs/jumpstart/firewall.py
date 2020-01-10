@@ -61,7 +61,6 @@ def adjust_firewall():
     try:
         os.fchmod(service, 0640)
         os.write(service, '<?xml version="1.0" encoding="utf-8"?>\n')
-        os.write(service, '<?xml version="1.0" encoding="utf-8"?>\n')
         os.write(service, '<service>\n')
         os.write(service, '  <short>LDAP</short>\n')
         os.write(service, '  <description>The Lightweight Directory '

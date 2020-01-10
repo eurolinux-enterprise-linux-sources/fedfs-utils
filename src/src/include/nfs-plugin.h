@@ -42,6 +42,11 @@ __BEGIN_DECLS
 #define JP_API_VERSION		(1)
 
 /**
+ * NFS plug-in library soname; passed to dlopen(3)
+ */
+#define JP_NFSPLUGIN_SONAME	"libnfsjunct.so.0"
+
+/**
  * A set of NFS FS locations
  */
 struct nfs_fsloc_set;

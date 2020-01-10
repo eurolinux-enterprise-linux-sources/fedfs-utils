@@ -35,6 +35,7 @@ from subprocess import Popen, PIPE
 try:
     from PyFedfs.run import EXIT_SUCCESS, EXIT_FAILURE
     from PyFedfs.run import run_as_user, restart_service
+    from PyFedfs.run import run_command
 except ImportError:
     print >> sys.stderr, \
         'Could not import a required Python module:', sys.exc_value
@@ -318,6 +319,10 @@ def replace_slapd_database(pathname):
     log.debug('Replacing "%s"...', pathname)
 
     ret = make_ldap_directory(pathname, 0700)
+    if ret != EXIT_SUCCESS:
+        return ret
+
+    ret = run_command(['chcon', 'system_u:object_r:slapd_db_t:s0', pathname])
     if ret != EXIT_SUCCESS:
         return ret
 

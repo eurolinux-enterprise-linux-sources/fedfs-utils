@@ -38,7 +38,7 @@
 #include <errno.h>
 #include <dirent.h>
 
-#include <attr/xattr.h>
+#include <sys/xattr.h>
 
 #include "fedfs.h"
 #include "nsdb.h"
@@ -394,9 +394,9 @@ junction_get_mode(const char *pathname, mode_t *mode)
 	if (fstat(fd, &stb) == -1) {
 		xlog(D_GENERAL, "%s: failed to stat %s: %m",
 			__func__, pathname);
+		(void)close(fd);
 		return FEDFS_ERR_ACCESS;
 	}
-
 	(void)close(fd);
 
 	xlog(D_CALL, "%s: pathname %s has mode %o",

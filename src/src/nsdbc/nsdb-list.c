@@ -324,10 +324,11 @@ main(int argc, char **argv)
 				nsdb_list_usage(progname);
 			}
 			break;
+		case '?':
+			nsdb_list_usage(progname);
 		default:
 			fprintf(stderr, "Invalid command line "
 				"argument: %c\n", (char)arg);
-		case '?':
 			nsdb_list_usage(progname);
 		}
 	}

@@ -363,8 +363,10 @@ nsdb_posix_to_path_array(const char *pathname, char ***path_array)
 	}
 
 	result = (char **)calloc(count + 1, sizeof(char *));
-	if (result == NULL)
+	if (result == NULL) {
+		free(normalized);
 		return FEDFS_ERR_SVRFAULT;
+	}
 
 	component = normalized;
 	for (i = 0; ; i++) {
@@ -378,9 +380,10 @@ nsdb_posix_to_path_array(const char *pathname, char ***path_array)
 		length = next - component;
 
 		result[i] = strndup(component, length);
-		if (result[i] == NULL)
+		if (result[i] == NULL) {
 			nsdb_free_string_array(result);
 			return FEDFS_ERR_SVRFAULT;
+		}
 
 		if (*next == '\0')
 			break;
@@ -622,6 +625,7 @@ FedFsStatus
 nsdb_path_array_to_uri_pathname(char * const *path_array, UriUriA *uri)
 {
 	UriPathSegmentA *pos, *result;
+	FedFsStatus status;
 	size_t length, len;
 	char *component;
 	unsigned int i;
@@ -631,6 +635,15 @@ nsdb_path_array_to_uri_pathname(char * const *path_array, UriUriA *uri)
 		return FEDFS_ERR_SVRFAULT;
 	result = pos;
 
+	/* Zero-component pathname? */
+	if (path_array[0] == NULL) {
+		pos->next = nsdb_new_uri_path_segment("");
+		if (pos->next == NULL) {
+			status = FEDFS_ERR_SVRFAULT;
+			goto out_err;
+		}
+	}
+
 	length = 0;
 	for (i = 0; path_array[i] != NULL; i++) {
 		component = path_array[i];
@@ -638,40 +651,49 @@ nsdb_path_array_to_uri_pathname(char * const *path_array, UriUriA *uri)
 
 		if (len == 0) {
 			xlog(D_GENERAL, "%s: Zero-length component", __func__);
-			return FEDFS_ERR_BADNAME;
+			status = FEDFS_ERR_BADNAME;
+			goto out_err;
 		}
 		if (len > NAME_MAX) {
 			xlog(D_GENERAL, "%s: Component length too long", __func__);
-			return FEDFS_ERR_NAMETOOLONG;
+			status = FEDFS_ERR_NAMETOOLONG;
+			goto out_err;
 		}
 		if (strchr(component, '/') != NULL) {
 			xlog(D_GENERAL, "%s: Local separator character "
 					"found in component", __func__);
-			return FEDFS_ERR_BADNAME;
+			status = FEDFS_ERR_BADNAME;
+			goto out_err;
 		}
 		if (!nsdb_pathname_is_utf8(component)) {
 			xlog(D_GENERAL, "%s: Bad character in component",
 				__func__);
-			return FEDFS_ERR_BADCHAR;
+			status = FEDFS_ERR_BADCHAR;
+			goto out_err;
 		}
 
 		length += STRLEN_SLASH + len;
 
 		if (length > PATH_MAX) {
 			xlog(D_GENERAL, "%s: Pathname too long", __func__);
-			return FEDFS_ERR_NAMETOOLONG;
+			status = FEDFS_ERR_NAMETOOLONG;
+			goto out_err;
 		}
 
 		pos->next = nsdb_new_uri_path_segment(component);
 		if (pos->next == NULL) {
-			nsdb_free_path_segments(result);
-			return FEDFS_ERR_SVRFAULT;
+			status = FEDFS_ERR_SVRFAULT;
+			goto out_err;
 		}
 		pos = pos->next;
 	}
 
 	uri->pathHead = result;
 	return FEDFS_OK;
+
+out_err:
+	nsdb_free_path_segments(result);
+	return status;
 }
 
 /**

@@ -151,10 +151,11 @@ main(int argc, char **argv)
 				nsdb_delete_fsl_usage(progname);
 			}
 			break;
+		case '?':
+			nsdb_delete_fsl_usage(progname);
 		default:
 			fprintf(stderr, "Invalid command line "
 				"argument: %c\n", (char)arg);
-		case '?':
 			nsdb_delete_fsl_usage(progname);
 		}
 	}

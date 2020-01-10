@@ -141,13 +141,13 @@ fedfs_lookup_junction_print_fsls(struct admin_fsl *fsl)
 static FedFsStatus
 fedfs_lookup_junction_try(admin_t host, char * const *path_array, int request)
 {
-	struct admin_fsl *fsls;
-	struct admin_fsn *fsn;
+	struct admin_fsl *fsls = NULL;
+	struct admin_fsn *fsn = NULL;
 	int status, err;
 
+	status = EXIT_FAILURE;
 	switch (request) {
 	case 0:
-		fsls = NULL;
 		err = admin_lookup_junction_none(host, path_array, &fsn);
 		break;
 	case 1:
@@ -158,9 +158,11 @@ fedfs_lookup_junction_try(admin_t host, char * const *path_array, int request)
 		err = admin_lookup_junction_nsdb(host, path_array,
 								&fsn, &fsls);
 		break;
+	default:
+		xlog(L_ERROR, "Unrecognized request");
+		goto out;
 	}
 
-	status = EXIT_FAILURE;
 	switch (err) {
 	case 0:
 		break;
@@ -184,23 +186,23 @@ fedfs_lookup_junction_try(admin_t host, char * const *path_array, int request)
 		printf("NSDB: %s:%u\n",
 			fsn->af_nsdb.an_hostname,
 			fsn->af_nsdb.an_port);
-		admin_free_fsn(fsn);
-		if (request > 0) {
+		if (request > 0)
 			fedfs_lookup_junction_print_fsls(fsls);
-			admin_free_fsls(fsls);
-		}
 		status = EXIT_SUCCESS;
 		break;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
 		fprintf(stderr, "LDAP result code (%d): %s\n",
 			admin_ldaperr(host),
 			ldap_err2string(admin_ldaperr(host)));
+		break;
 	case FEDFS_ERR_NSDB_PARAMS:
 		printf("No connection parameters found\n");
 		break;
 	default:
 		nsdb_print_fedfsstatus(admin_status(host));
 	}
+	admin_free_fsls(fsls);
+	admin_free_fsn(fsn);
 
 out:
 	return status;

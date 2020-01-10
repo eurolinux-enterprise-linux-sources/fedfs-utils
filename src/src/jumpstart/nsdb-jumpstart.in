@@ -97,11 +97,20 @@ There is NO WARRANTY, to the extent permitted by law.''')
 
     args = parser.parse_args()
 
+    if not os.path.isdir(args.statedir):
+        try:
+            os.mkdir(args.statedir)
+        except OSError:
+            print >> sys.stderr, \
+                'Failed to create ', args.statedir
+            return EXIT_FAILURE
+
+    logfile = os.path.join(args.statedir, 'nsdb-jumpstart.log')
     log.basicConfig(level=log.DEBUG,
                     format='%(asctime)s %(name)-12s '
                            '%(levelname)-8s %(message)s',
                     datefmt='%m-%d %H:%M',
-                    filename='/var/lib/fedfs/nsdb-jumpstart.log',
+                    filename=logfile,
                     filemode='a')
     console = log.StreamHandler()
     console.setLevel(log.INFO)

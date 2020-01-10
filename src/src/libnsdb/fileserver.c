@@ -512,7 +512,6 @@ nsdb_new_get_ncedn_s(nsdb_t host, const char *naming_context, char **dn)
 	LDAPMessage *response, *message;
 	LDAP *ld = host->fn_ldap;
 	FedFsStatus retval;
-	unsigned count;
 	int entries;
 
 	host->fn_ldaperr = nsdb_search_nsdb_all_s(ld, naming_context,
@@ -539,25 +538,27 @@ nsdb_new_get_ncedn_s(nsdb_t host, const char *naming_context, char **dn)
 	}
 
 	entries = ldap_count_messages(ld, response);
-	if (entries == -1) {
-		xlog(D_GENERAL, "%s: Empty LDAP response\n", __func__);
+	switch (entries) {
+	case -1:
+		xlog(D_GENERAL, "%s: Empty LDAP response", __func__);
 		retval = FEDFS_ERR_NSDB_FAULT;
 		goto out;
+	case 1:
+		xlog(D_GENERAL, "%s: %s does not contain a new-style NCE",
+			__func__, naming_context);
+		retval = FEDFS_ERR_NSDB_NONCE;
+		goto out;
+	default:
+		xlog(D_CALL, "%s: received %d messages", __func__, entries);
+		break;
 	}
-	xlog(D_CALL, "%s: received %d messages", __func__, entries);
 
 	retval = FEDFS_OK;
-	for (message = ldap_first_message(ld, response), count = 0;
+	for (message = ldap_first_message(ld, response);
 	     message != NULL && retval == FEDFS_OK;
 	     message = ldap_next_message(ld, message)) {
 		switch (ldap_msgtype(message)) {
 		case LDAP_RES_SEARCH_ENTRY:
-			if (++count > 1) {
-				xlog(D_CALL, "%s: more than one NCE under %s",
-					__func__, naming_context);
-				retval = FEDFS_ERR_NSDB_NONCE;
-				goto out;
-			}
 			retval = nsdb_parse_ncedn(ld, message, dn);
 			if (retval == FEDFS_OK)
 				xlog(D_CALL, "%s: %s contains NCE %s",
@@ -704,10 +705,10 @@ FedFsStatus
 nsdb_get_naming_contexts_s(nsdb_t host, char ***contexts)
 {
 	LDAPMessage *response, *message;
-	LDAP *ld = host->fn_ldap;
 	FedFsStatus retval;
 	int entries;
 	char **tmp;
+	LDAP *ld;
 
 	if (host == NULL)
 		return FEDFS_ERR_INVAL;
@@ -718,6 +719,7 @@ nsdb_get_naming_contexts_s(nsdb_t host, char ***contexts)
 	if (contexts == NULL)
 		return FEDFS_ERR_INVAL;
 
+	ld = host->fn_ldap;
 	host->fn_ldaperr = nsdb_search_nsdb_attr_s(ld, LDAP_ROOT_DSE,
 							"(objectClass=*)",
 							"namingContexts",
@@ -896,7 +898,7 @@ nsdb_parse_nfs_uri_fsl(const char *attr, UriUriA *uri,
 		size_t portlen;
 
 		portlen = uri->portText.afterLast - uri->portText.first;
-		if (portlen > sizeof(string)) {
+		if (portlen > sizeof(string) - 1) {
 			xlog(D_GENERAL, "%s: NFS URI has invalid port",
 				__func__, attr);
 			goto out;
@@ -1526,8 +1528,14 @@ nsdb_get_fsn_find_entry_s(nsdb_t host, const char *nce, const char *fsn_uuid,
 	ldap_msgfree(response);
 
 	if (retval == FEDFS_OK) {
-		xlog(D_CALL, "%s: returning fsn", __func__);
-		*fsn = tmp;
+		if (tmp == NULL) {
+			xlog(D_CALL, "%s: No FSN entries for FSN UUID %s",
+				__func__, fsn_uuid);
+			retval = FEDFS_ERR_NSDB_NOFSN;
+		} else {
+			xlog(D_CALL, "%s: returning fsn", __func__);
+			*fsn = tmp;
+		}
 	} else
 		nsdb_free_fedfs_fsn(tmp);
 	return retval;
@@ -1589,8 +1597,10 @@ nsdb_get_fsn_s(nsdb_t host, const char *nce, const char *fsn_uuid,
 		if (retval == FEDFS_OK)
 			j++;
 	}
-	if (j == 0)
+	if (j == 0) {
+		retval = FEDFS_ERR_NSDB_NONCE;
 		goto out;
+	}
 
 	for (j = 0; nce_list[j] != NULL; j++) {
 		retval = nsdb_get_fsn_find_entry_s(host, nce_list[j],
@@ -1765,17 +1775,21 @@ nsdb_list_find_entries_s(nsdb_t host, const char *nce, char ***fsns)
 		}
 	}
 
-	if (retval == FEDFS_OK) {
-		if (tmp[0] == NULL) {
-			xlog(D_CALL, "%s: No FSN entries under %s",
-				__func__, nce);
-			retval = FEDFS_ERR_NSDB_NOFSN;
-		} else {
-			xlog(D_CALL, "%s: returning fsn list", __func__);
-			*fsns = tmp;
-		}
-	} else
+	if (retval != FEDFS_OK) {
 		nsdb_free_string_array(tmp);
+		goto out;
+	}
+
+	if (tmp[0] == NULL) {
+		xlog(D_CALL, "%s: No FSN entries under %s",
+			__func__, nce);
+		nsdb_free_string_array(tmp);
+		retval = FEDFS_ERR_NSDB_NOFSN;
+		goto out;
+	}
+
+	xlog(D_CALL, "%s: returning fsn list", __func__);
+	*fsns = tmp;
 
 out:
 	ldap_msgfree(response);

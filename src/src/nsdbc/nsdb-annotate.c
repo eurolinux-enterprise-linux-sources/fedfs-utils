@@ -166,7 +166,6 @@ main(int argc, char **argv)
 			break;
 		case '?':
 			nsdb_annotate_usage(progname);
-			break;
 		default:
 			fprintf(stderr, "Invalid command line "
 				"argument: %c\n", (char)arg);

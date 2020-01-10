@@ -813,7 +813,7 @@ nsdb_copy_referrals_array(char **refs, char ***referrals)
 		return FEDFS_OK;
 	count = i;
 
-	tmp = calloc(count, sizeof(char *));
+	tmp = calloc(count + 1, sizeof(char *));
 	if (tmp == NULL)
 		return FEDFS_ERR_SVRFAULT;
 

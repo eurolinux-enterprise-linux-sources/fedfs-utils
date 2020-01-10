@@ -1,6 +1,6 @@
 Name:           fedfs-utils
-Version:        0.10.0
-Release:        1%{?dist}
+Version:        0.10.3
+Release:        2%{?dist}
 Summary:        Utilities for mounting and managing FedFS
 
 Group:          System Environment/Daemons
@@ -14,8 +14,6 @@ BuildRequires:  python2-devel
 BuildRequires:  systemd systemd-units
 
 Source0:        http://oss.oracle.com/projects/%{name}/dist/files/%{name}-%{version}.tar.gz
-
-Patch100:       fedfs-utils-0.10.0-missing-man-pages.patch
 
 %global _hardened_build 1
 %global unit_name rpcfedfsd
@@ -45,9 +43,17 @@ FedFS may support other network file system protocols in the future.
 
 %prep
 %setup -q -n %{name}-%{version}
-%patch100 -p1
 
 %build
+%ifarch s390 s390x
+PIE="-fPIE"
+%else
+PIE="-fpie"
+%endif
+export PIE
+export CFLAGS="$RPM_OPT_FLAGS $ARCH_OPT_FLAGS $PIE"
+export LDFLAGS="-pie -Wl,-z,relro -Wl,-z,now"
+
 ./autogen.sh
 %configure --prefix=/usr
 make %{?_smp_mflags}
@@ -418,6 +424,13 @@ FedFS may support other network file system protocols in the future.
 %{_mandir}/man8/nsdb-*
 
 %changelog
+* Wed Oct 22 2014 Steve Dickson <steved@redhat.com> - 0.10.3-2
+- Reworked CFLAGS to put back execshield (bz 983257)
+
+* Tue Oct 21 2014 Steve Dickson <steved@redhat.com> - 0.10.3-1
+- Updated to latest upstream release: 0.10.3 (bz 1110228)
+- Added the PIE and RELRO CFLAGS (bz 983257)
+
 * Sat Mar  8 2014 Steve Dickson <steved@redhat.com> - 0.10.0-1
 - Updated to latest upstream release: 0.10.0 (bz 1069971)
 

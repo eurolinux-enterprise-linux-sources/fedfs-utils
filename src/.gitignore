@@ -77,3 +77,4 @@ depcomp
 .libs/
 .stgit*
 py-compile
+cov-int/

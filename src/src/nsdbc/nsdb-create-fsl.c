@@ -105,9 +105,10 @@ nsdb_create_fsl_usage(const char *progname)
 int
 main(int argc, char **argv)
 {
-	char *nce, *fsn_uuid, *fsl_uuid, *servername, *serverpath;
+	char *nce, *servername, *serverpath;
 	char *progname, *binddn, *nsdbname;
 	unsigned short nsdbport, serverport;
+	uuid_t fsn_uu, fsl_uu;
 	struct fedfs_fsl *fsl;
 	FedFsStatus retval;
 	nsdb_t host;
@@ -160,22 +161,20 @@ main(int argc, char **argv)
 				nsdb_create_fsl_usage(progname);
 			}
 			break;
+		case '?':
+			nsdb_create_fsl_usage(progname);
 		default:
 			fprintf(stderr, "Invalid command line "
 				"argument: %c\n", (char)arg);
-		case '?':
 			nsdb_create_fsl_usage(progname);
 		}
 	}
 	if (argc == optind + 4) {
-		uuid_t uu;
-		fsn_uuid = argv[optind];
-		if (uuid_parse(fsn_uuid, uu) == -1) {
+		if (uuid_parse(argv[optind], fsn_uu) == -1) {
 			fprintf(stderr, "Invalid FSN UUID was specified\n");
 			nsdb_create_fsl_usage(progname);
 		}
-		fsl_uuid = argv[optind + 1];
-		if (uuid_parse(fsl_uuid, uu) == -1) {
+		if (uuid_parse(argv[optind + 1], fsl_uu) == -1) {
 			fprintf(stderr, "Invalid FSL UUID was specified\n");
 			nsdb_create_fsl_usage(progname);
 		}
@@ -201,8 +200,8 @@ main(int argc, char **argv)
 		fprintf(stderr, "Failed to allocate FSL\n");
 		goto out;
 	}
-	strcpy(fsl->fl_fsluuid, fsl_uuid);
-	strcpy(fsl->fl_fsnuuid, fsn_uuid);
+	uuid_unparse(fsn_uu, fsl->fl_fsnuuid);
+	uuid_unparse(fsl_uu, fsl->fl_fsluuid);
 
 	retval = FEDFS_ERR_NAMETOOLONG;
 	if (strlen(servername) >= sizeof(fsl->fl_u.fl_nfsfsl.fn_fslhost)) {
@@ -284,7 +283,7 @@ main(int argc, char **argv)
 	switch (retval) {
 	case FEDFS_OK:
 		printf("Successfully created FSL record for %s under %s\n",
-				fsl_uuid, nce);
+				fsl->fl_fsluuid, nce);
 		break;
 	case FEDFS_ERR_NSDB_NONCE:
 		if (nce == NULL)
@@ -305,12 +304,12 @@ main(int argc, char **argv)
 			break;
 		default:
 			fprintf(stderr, "Failed to create FSL %s: %s\n",
-				fsl_uuid, nsdb_ldaperr2string(host));
+				fsl->fl_fsluuid, nsdb_ldaperr2string(host));
 		}
 		break;
 	default:
 		fprintf(stderr, "Failed to create FSL %s: %s\n",
-			fsl_uuid, nsdb_display_fedfsstatus(retval));
+			fsl->fl_fsluuid, nsdb_display_fedfsstatus(retval));
 	}
 
 	nsdb_close_nsdb(host);

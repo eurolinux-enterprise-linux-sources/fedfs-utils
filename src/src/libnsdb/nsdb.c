@@ -95,7 +95,7 @@ static char fedfs_nsdbcerts_dirname[PATH_MAX + 1] =
 /**
  * Stores pathname of database containing FedFS persistent state
  */
-static char fedfs_db_filename[PATH_MAX] =
+static char fedfs_db_filename[PATH_MAX + 1] =
 			FEDFS_DEFAULT_STATEDIR "/" FEDFS_DATABASE_FILE;
 
 /**
@@ -110,15 +110,23 @@ static char fedfs_db_filename[PATH_MAX] =
 _Bool
 nsdb_set_parentdir(const char *parentdir)
 {
-	static char buf[PATH_MAX];
+	static char buf[PATH_MAX + 1];
 	struct stat st;
 	char *path;
 	int len;
 
+	if (parentdir == NULL) {
+		xlog(D_GENERAL, "%s: Passed a NULL argument", __func__);
+		return false;
+	}
+	if (strlen(parentdir) > PATH_MAX) {
+		xlog(D_GENERAL, "%s: Argument too long", __func__);
+		return false;
+	}
+
 	xlog(D_CALL, "%s: Setting up %s as our FedFS state directory",
 		__func__, parentdir);
 
-	/* First: test length of name and whether it exists */
 	if (lstat(parentdir, &st) == -1) {
 		xlog(D_GENERAL, "%s: Failed to stat %s: %m",
 			__func__, parentdir);
@@ -129,12 +137,10 @@ nsdb_set_parentdir(const char *parentdir)
 			__func__, parentdir);
 		return false;
 	}
-
-	/* Ensure we have a clean directory pathname */
-	strncpy(buf, parentdir, sizeof(buf));
+	strcpy(buf, parentdir);
 	path = dirname(buf);
 	if (*path == '.') {
-		xlog(D_GENERAL, "%s: Unusable pathname %s",
+		xlog(D_GENERAL, "%s: Pathname %s is relative",
 			__func__, parentdir);
 		return false;
 	}
@@ -154,9 +160,7 @@ nsdb_set_parentdir(const char *parentdir)
 		return false;
 	}
 	strcpy(fedfs_nsdbcerts_dirname, buf);
-
-	strncpy(fedfs_base_dirname, parentdir, sizeof(fedfs_base_dirname));
-
+	strcpy(fedfs_base_dirname, parentdir);
 	return true;
 }
 
@@ -1456,9 +1460,10 @@ nsdb_enumerate_nsdbs(char ***nsdblist)
 		char *tmp;
 
 		tmp = malloc(strlen(hostname) + strlen(":") + strlen(port) + 1);
-		if (tmp == NULL)
+		if (tmp == NULL) {
 			nsdb_free_string_array(result);
 			goto out_free;
+		}
 
 		(void)sprintf(tmp, "%s:%s", hostname, port);
 

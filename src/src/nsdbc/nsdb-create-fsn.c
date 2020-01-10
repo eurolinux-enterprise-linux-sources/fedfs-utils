@@ -170,10 +170,11 @@ main(int argc, char **argv)
 			}
 			ttl = (unsigned int)tmp;
 			break;
+		case '?':
+			nsdb_create_fsn_usage(progname);
 		default:
 			fprintf(stderr, "Invalid command line "
 				"argument: %c\n", (char)arg);
-		case '?':
 			nsdb_create_fsn_usage(progname);
 		}
 	}

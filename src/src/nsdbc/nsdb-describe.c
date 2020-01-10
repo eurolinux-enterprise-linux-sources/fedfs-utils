@@ -153,10 +153,11 @@ main(int argc, char **argv)
 		case 'y':
 			delete = true;
 			break;
+		case '?':
+			nsdb_describe_usage(progname);
 		default:
 			fprintf(stderr, "Invalid command line "
 				"argument: %c\n", (char)arg);
-		case '?':
 			nsdb_describe_usage(progname);
 		}
 	}

@@ -134,10 +134,11 @@ main(int argc, char **argv)
 				nsdb_nces_usage(progname);
 			}
 			break;
+		case '?':
+			nsdb_nces_usage(progname);
 		default:
 			fprintf(stderr, "Invalid command line "
 				"argument: %c\n", (char)arg);
-		case '?':
 			nsdb_nces_usage(progname);
 		}
 	}

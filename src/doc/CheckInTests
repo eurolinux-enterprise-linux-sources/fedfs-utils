@@ -92,11 +92,13 @@ bisecting to be useful.
  3.  "make -s -j3" must complete without error or new compiler
      or sparse warnings
  4.  "make doxy" must complete with no errors or warnings
- 5.  "make distcheck" must complete without error
- 6.  "make distclean" must complete without error
- 7.  "git status" must produce no output on a clean tree
- 8.  "git clean -d -f -x" does not break anything
- 9.  "git log -p" shows no new white space damage
+ 5.  "make covbuild" must complete with at least 85% compilation
+     units ready for analysis
+ 6.  "make distcheck" must complete without error
+ 7.  "make distclean" must complete without error
+ 8.  "git status" must produce no output on a clean tree
+ 9.  "git clean -d -f -x" does not break anything
+10.  "git log -p" shows no new white space damage
 
 To preserve bisectability, the tree MUST build after each commit.
 
@@ -112,7 +114,6 @@ At some point, we'd like:
  1.  Automated checking of coding style and white space
  2.  Automated fortify or splint testing during check-in
  3.  Automated unit tests
- 4.  Regular runs against coverity
 
 
 Per-release

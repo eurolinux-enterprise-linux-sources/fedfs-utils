@@ -176,11 +176,7 @@ nfsref_remove_delete_fsn(const char *junct_path)
 			fsn_uuid, nce);
 		break;
 	case FEDFS_ERR_NSDB_NONCE:
-		if (nce == NULL)
-			xlog(L_ERROR, "NSDB %s:%u has no NCE",
-				nsdb_hostname(host), nsdb_port(host));
-		else
-			xlog(L_ERROR, "NCE %s does not exist", nce);
+		xlog(L_ERROR, "NCE %s does not exist", nce);
 		break;
 	case FEDFS_ERR_NSDB_NOFSN:
 		xlog(L_ERROR, "NSDB %s:%u has no such FSN %s",
