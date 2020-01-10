@@ -1,0 +1,404 @@
+.\"@(#)nsdb-jumpstart.8
+.\"
+.\" @file doc/man/nsdb-jumpstart.8
+.\" @brief man page for nsdb-jumpstart tool
+.\"
+
+.\"
+.\" Copyright 2013 Oracle.  All rights reserved.
+.\"
+.\" This file is part of fedfs-utils.
+.\"
+.\" fedfs-utils is free software; you can redistribute it and/or modify
+.\" it under the terms of the GNU General Public License version 2.0 as
+.\" published by the Free Software Foundation.
+.\"
+.\" fedfs-utils is distributed in the hope that it will be useful, but
+.\" WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU General Public License version 2.0 for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License
+.\" version 2.0 along with fedfs-utils.  If not, see:
+.\"
+.\"	http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+.\"
+.TH NSDB-JUMPSTART 8 "@pubdate@"
+.SH NAME
+nsdb-jumpstart \- Administer a basic FedFS NSDB using OpenLDAP
+.SH SYNOPSIS
+.B nsdb-jumpstart
+.RB [ \-h , \-\-help ]
+.RB [ \-\-version ]
+.P
+.B nsdb-jumpstart
+.RB [ \-\-statedir =
+.IR statedir ]
+.B install
+.RB [ \-\-security =
+.IR mode ]
+.P
+.B nsdb-jumpstart
+.RB [ \-\-statedir =
+.IR statedir ]
+.B status
+.P
+.B nsdb-jumpstart
+.RB [ \-\-statedir =
+.IR statedir ]
+.B backup
+.P
+.B nsdb-jumpstart
+.RB [ \-\-statedir =
+.IR statedir ]
+.B restore
+.RI [ backup-name ]
+.SH INTRODUCTION
+RFC 5716 introduces the Federated File System (FedFS, for short).
+FedFS is an extensible standardized mechanism
+by which system administrators construct
+a coherent namespace across multiple file servers using
+.IR "file system referrals" .
+For further details, see
+.BR fedfs (7).
+.P
+A FedFS domain's namespace is joined together via
+.IR junctions .
+When a file-access client encounters a junction on a file server,
+the file server provides a list of locations where that client
+can access the target file set to which the juntion refers.
+.P
+In a FedFS domain, these location lists are stored on one or more LDAP servers,
+known as
+.IR "namespace databases" ,
+or
+.IR NSDBs ,
+for short.
+.P
+FedFS-enabled file servers access the information stored
+on NSDBs via standard LDAP queries.
+Tools that administer a FedFS domain use ldapmodify queries
+to manage information stored on an NSDB.
+File-access clients have no need to access NSDBs directly.
+.P
+Further information about junctions and NSDBs is available in
+.BR fedfs (7).
+.SH DESCRIPTION
+The FedFS NSDB Proposed Standard allows flexible use
+of any LDAP server and its Directory Information Tree
+to store and manage NSDB information.
+.P
+The
+.BR nsdb-jumpstart (8)
+command provides a simplified but fully capable stand-alone
+NSDB based specifically on OpenLDAP.
+Using this command,
+you can install a fresh NSDB, or back up or restore your NSDB data.
+It can even construct a self-signed x.509 certificate to enable
+secure NSDB queries.
+.SS Operation
+The
+.B install
+subcommand sets up an empty NSDB, ready to be used in a FedFS domain.
+The new NSDB replaces any OpenLDAP configuration
+that may already exist on the system.
+OpenLDAP must already be installed on the system.
+.P
+Once the new NSDB is running,
+FedFS fileset location information is stored as records
+in a Directory Information Tree under the NCE.
+This information is managed with commands like
+.BR nsdb-create-fsn (8).
+.P
+A handful of parameters are needed to set up the new NSDB.
+These are gathered via a brief interview.
+The domain name and administrator credentials are provided during
+this interview.
+Passwords are not checked for strength,
+however blank passwords are not permitted.
+.P
+The baseline security requirements for the NSDB are specified
+at install time using the
+.B \-\-security=
+option.  See the
+.B SECURITY
+section for an in-depth discussion.
+.P
+Once set up with the
+.B install
+subcommand, OpenLDAP listens for LDAP queries on the standard LDAP port (389).
+The underlying LDAP server can be configured like any other OpenLDAP server
+using the new-style
+.I cn=config
+configuration interface.
+.P
+To display the current status of the NSDB service on the local host, use the
+.B status
+subcommand.
+Information about the local NSDB service is displayed, including whether
+the LDAP service is started, whether it actually is an NSDB, and
+whether TLS security is required to use it.
+.P
+The
+.BR nsdb-jumpstart (8)
+command also provides backup and restore facilities.
+The
+.B backup
+subcommand saves location information stored on the local NSDB
+to a dated LDIF file.
+LDIF files created by the
+.B backup
+command are stored in the
+.I @statedir@/nsdb-backup
+directory by default.
+.P
+The
+.B restore
+subcommand completely replaces the contents of the NSDB with a backup
+contained in of one of the previously saved LDIF files.
+The
+.B restore
+subcommand takes one positional argument, which is the name of
+the backup to restore.
+A list of backups is displayed by using the
+.B restore
+subcommand with no argument.
+.P
+The
+.BR nsdb-jumpstart (8)
+command must run as root.
+A audit log of each
+.BR nsdb-jumpstart (8)
+operation is stored in
+.IR @statedir@/nsdb-jumpstart.log .
+.SS Subcommands
+Valid
+.BR nsdb-jumpstart (8)
+subcommands are:
+.IP "\fBinstall\fP"
+Replace the OpenLDAP configuration on the local system with
+a ready-built NSDB.
+The user is asked to confirm before action is taken.
+.IP
+Specifying the
+.B \-\-security=
+option sets the transport security that the NSDB requires
+clients to use when communicating with it.
+.IP "\fBstatus\fP"
+Display the status of the NSDB on the local system.
+This subcommand takes no arguments.
+.IP "\fBbackup\fP"
+Generate an LDIF containing the NSDB information stored
+on the local LDAP server.
+The LDIF is stored in a dated file under
+.IR @statedir@/nsdb-backup .
+This subcommand takes no arguments.
+.IP "\fBrestore\fP"
+Replace the NSDB information on the local LDAP server
+with the contents of an LDIF.
+This subcommand takes a backup name as an argument.
+If no backup name is given,
+a list of backups that can be restored is displayed.
+The user is asked to confirm before action is taken.
+.SS Command line options
+The following options are specified before the subcommand on the command line.
+.IP "\fB\-\-help"
+Displays usage and copyright information, then exit.
+.IP "\fB\-\-version"
+Displays fedfs-utils version information, then exit.
+.IP "\fB\-\-stateidr=\fIpathname\fP"
+Specifies the pathname of the local directory
+under which NSDB data is maintained.
+By default, this directory is
+.IR @statedir@ .
+.SS Subcommand options
+.IP "\fB\-\-security=\fImode\fP"
+Selects the security mode of the NSDB.
+This option may be specified only on the
+.B install
+subcommand.
+Valid
+.I mode
+values are
+.B none
+and
+.BR tls .
+.P
+If
+.B none
+is specified, or the
+.B \-\-security=
+option is not specified, clients can connect to this NSDB in the clear.
+.P
+If
+.B tls
+is specified, the
+.B install
+subcommand creates a self-signed x.509 certificate,
+and configures the NSDB so that clients are required to use TLS
+when connecting to the NSDB.
+.SH EXIT CODES
+The
+.BR nsdb-jumpstart (8)
+command returns one of two values upon exit.
+.TP
+.B 0
+The subcommand succeeded.
+.TP
+.B 1
+The subcommand failed.
+.SH EXAMPLES
+Suppose you are the FedFS administrator of the
+.I example.net
+FedFS domain.
+After you have chosen a reliable server in the
+.I example.net
+domain to act as your NSDB, log in on that server as root,
+ensure that OpenLDAP is installed,
+and that any configuration can be discarded.
+.P
+To create a new NSDB with a self-signed certificate for the
+.I example.net
+domain, use:
+.RS
+.sp
+# ./nsdb-jumpstart install --security=tls
+.br
+This command is about to replace the OpenLDAP configuration on this system.
+.br
+Do you want to continue? [y/N] y
+.br
+Enter the name of the Fedfs domain this NSDB will server
+.br
+FedFS domain [ example.net ]:
+.br
+Enter the LDAP administrator DN for this NSDB
+.br
+Admin DN [ cn=admin,cn=config ]:
+.br
+Enter the LDAP administrator password for this DN
+.br
+New password:
+.br
+Re-enter new password:
+.br
+Enter the NSDB administrator password for this DN
+.br
+New password:
+.br
+Re-enter new password:
+.br
+Last chance: about to replace the OpenLDAP configuration on this system.
+.br
+Continue? [y/N] y
+.br
+Setting up a self-signed x.509 certificate.  Please answer the following questions:
+.br
+
+.br
+Country (C)? US
+.br
+State or province (ST)? Massachusetts
+.br
+City (L)? Boston
+.br
+Organization (O)? Red Sox
+.br
+Organizational unit (OU)? Fans
+.br
+
+.br
+NSDB configuration was successful.
+.br
+
+.br
+Slapd is enabled and running
+.br
+The LDAP administrator DN is: cn=admin,cn=config
+.br
+The NSDB administrator DN is: cn=NSDB Manager,dc=example,dc=net
+.br
+The NCE is: ou=fedfs,dc=example,dc=net
+.br
+
+.br
+Distribute the NSDB's certificate in /etc/openldap/nsdb-cert.pem
+.br
+#
+.RE
+.SH SECURITY
+The NSDB created by the
+.BR nsdb-jumpstart (8)
+command allows anonymous read access to the NCE and all entries under it.
+The LDAP server's rootDSE is also readable by anyone.
+An NSDB client must bind with administrator privileges
+to update NSDB records for a FedFS domain.
+ACLs may be adjusted after the NSDB is set up with
+.BR nsdb-jumpstart (8).
+.P
+Before binding, however, NSDB clients must connect to the NSDB to use it.
+The
+.B \-\-security=
+setting determines what type of transport layer security is required
+to connect to the NSDB.
+.P
+When the
+.B \-\-security=none
+option is specified during NSDB setup,
+or if no
+.B \-\-security=
+setting is specified,
+NSDB clients can connect to the NSDB using an unencrypted
+connection to the standard LDAP port (389).
+.P
+By specifying the
+.B \-\-security=tls
+option on the
+.BR nsdb-jumpstart (8)
+command, a self-signed x.509 certificate is created
+that NSDB clients must use to authenticate the NSDB and its contents.
+The underlying LDAP server requires the use of TLS
+and the use of AES or better encryption when a client access the NSDB.
+The NSDB never authenticates its clients.
+.P
+To use this NSDB, the new certificate material must be distributed
+to NSDB clients (fileservers and administrative systems)
+and installed using the
+.BR nsdbparams (8)
+command, or it can be transferred directly to NSDB clients that
+are running the
+.BR rpc.fedfsd (8)
+daemon.
+.P
+The use of a transport encryption mechanism such as TLS is
+strongly recommended to protect NSDB requests on untrusted networks.
+SASL is currently not supported for the NSDB protocol.
+.SH FILES
+.TP
+.I @statedir@/nsdb-jumpstart.log
+Log file created during subcommand processing
+.TP
+.I /etc/openldap/nsdb-cert.pem
+File containing the server's x.509 certificate, in PEM format
+.TP
+.I /etc/openldap/nsdb-key.pem
+File containing the server's private key, in PEM format
+.TP
+.I @statedir@/nsdb-db
+Directory containing back-end database for the LDAP server's
+domain controller root suffix
+.SH "SEE ALSO"
+.BR fedfs (7),
+.BR nfsref (8),
+.BR nsdb-create-fsn (8),
+.BR nsdbparams (8),
+.BR rpc.fedfsd (8)
+.sp
+RFC 5716 for FedFS requirements and overview
+.SH COLOPHON
+This page is part of the fedfs-utils package.
+A description of the project and information about reporting bugs
+can be found at
+.IR http://wiki.linux-nfs.org/wiki/index.php/FedFsUtilsProject .
+.SH "AUTHOR"
+Chuck Lever <chuck.lever@oracle.com>

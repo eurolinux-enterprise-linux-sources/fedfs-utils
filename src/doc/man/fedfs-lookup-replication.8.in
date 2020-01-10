@@ -1,0 +1,228 @@
+.\"@(#)fedfs-lookup-replication.8"
+.\"
+.\" @file doc/man/fedfs-lookup-replication.8
+.\" @brief man page for fedfs-lookup-replication client command
+.\"
+
+.\"
+.\" Copyright 2011, 2013 Oracle.  All rights reserved.
+.\"
+.\" This file is part of fedfs-utils.
+.\"
+.\" fedfs-utils is free software; you can redistribute it and/or modify
+.\" it under the terms of the GNU General Public License version 2.0 as
+.\" published by the Free Software Foundation.
+.\"
+.\" fedfs-utils is distributed in the hope that it will be useful, but
+.\" WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU General Public License version 2.0 for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License
+.\" version 2.0 along with fedfs-utils.  If not, see:
+.\"
+.\"	http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+.\"
+.TH FEDFS-LOOKUP-REPLICATION 8 "@pubdate@"
+.SH NAME
+fedfs-lookup-replication \- send a FEDFS_LOOKUP_REPLICATION ADMIN protocol request
+.SH SYNOPSIS
+.B fedfs-lookup-replication
+.RB [ \-?d ]
+.RB [ \-n
+.IR nettype ]
+.RB [ \-h
+.IR hostname ]
+.RB [ \-s
+.IR security ]
+.RB [ \-t
+.IR resolvetype ]
+.I path
+.SH INTRODUCTION
+RFC 5716 introduces the Federated File System (FedFS, for short).
+FedFS is an extensible standardized mechanism
+by which system administrators construct
+a coherent namespace across multiple file servers using
+.IR "file system referrals" .
+For further details, see
+.BR fedfs (7).
+.P
+FedFS-enabled file servers allow remote administrative access via an
+authenticated RPC protocol known as the
+.IR "FedFS ADMIN protocol" .
+Using this protocol, FedFS administrators manage
+FedFS junctions and NSDB connection parameter information
+on remote FedFS-enabled file servers.
+.SH DESCRIPTION
+The
+.BR fedfs-lookup-replication (8)
+command is part of a collection of low-level single-use programs
+that is intended for testing the FedFS ADMIN protocol or for use in scripts.
+It sends a single FEDFS_LOOKUP_REPLICATION request to a remote
+FedFS ADMIN protocol service.
+.P
+The FEDFS_LOOKUP_REPLICATION request causes a remote server
+to reveal the contents of a replication marker,
+or to report cached or immediate NSDB lookup results as that server sees them.
+The
+.BR fedfs-lookup-replication (8)
+command takes a single positional parameter which is the
+pathname on the remote server of the junction to be looked up.
+The pathname is relative to the root
+of the local file system on the remote server.
+.P
+Resolving a junction means performing an NSDB query with the contents
+of the junction to obtain a list of fileset locations, or FSLs,
+matching the stored UUID.
+The meaning of these is described in more detail in
+.BR fedfs (7).
+.P
+There are three distinct types of replication lookup:
+.TP
+.B none
+The remote server reports the actual contents of the replication stored
+on its local disk.
+This includes a UUID and the name and port of an NSDB.
+If the
+.B \-t
+option is not specified, this type of lookup is performed.
+.TP
+.B cache
+The remote server reports lookup results it may have cached from
+previous replication lookup requests.
+This includes a UUID, the name and port of an NSDB, and the cached
+list of fileset locations matching the UUID in the replication marker.
+Not all FedFS ADMIN service implementations support this type of request.
+.TP
+.B nsdb
+The remote server performs a fresh replication lookup,
+and the results are returned.
+This includes an UUID, the name and port of an NSDB,
+and a list of fileset locations matching the UUID in the replication marker.
+.SH OPTIONS
+.IP "\fB\-d, \-\-debug"
+Enables debugging messages during operation.
+.IP "\fB\-?, \-\-help"
+Displays
+.BR fedfs-lookup-replication (8)
+version information and a usage message on
+.IR stderr .
+.IP "\fB\-h, \-\-hostname=\fIhostname\fP"
+Specifies the hostname of a remote FedFS ADMIN service.
+If this option is not specified, the default value is
+.BR localhost .
+.IP "\fB\-n, \-\-nettype=\fInettype\fP"
+Specifies the transport to use when contacting the remote FedFS ADMIN service.
+Typically the
+.I nettype
+is one of
+.B tcp
+or
+.BR udp .
+If this option is not specified, the default value is
+.BR netpath .
+See
+.BR rpc (3t)
+for details.
+.IP "\fB\-p, \-\-path=\fIpathname\fP"
+Specifies the location on the remote server where the target FedFS replication
+resides.
+This pathname is relative to the remote server's physical root directory,
+not the remote server's NFS pseudoroot.
+.IP "\fB\-t, \-\-resolvetype=\fItype\fP"
+Specifies the desired type of resolution.  Valid values for
+.I type
+are
+.BR 0 ,
+.BR none ,
+.BR fedfs_resolve_none ,
+.BR 1 ,
+.BR cache ,
+.BR fedfs_resolve_cache ,
+.BR 2 ,
+.BR nsdb ", or"
+.BR fedfs_resolve_nsdb .
+The value is not case-sensitive.
+If this option is not specified, the default value is
+.BR none .
+.IP "\fB\-s, \-\-security=\fIflavor\fP"
+Specifies the security flavor to use
+when contacting the remote FedFS ADMIN service.
+Valid flavors are
+.BR sys ,
+.BR unix ,
+.BR krb5 ,
+.BR krb5i ", and"
+.BR krb5p .
+If this option is not specified, the
+.B unix
+flavor is used.
+See the
+.B SECURITY
+section of this man page for details.
+.SH EXAMPLES
+Suppose you are the FedFS administrator of the
+.I example.net
+FedFS domain and that your domain's NSDB hostname is
+.IR nsdb.example.net .
+You have created a FedFS replication on file server
+.IR fs.example.net .
+To see how the replication appears on the remote server, use:
+.RS
+.sp
+$ fedfs-lookup-replication -h fs.example.net /export/replication1
+.br
+Call completed successfully
+.br
+FSN UUID: 89c6d208-7280-11e0-9f1d-000c297fd679
+.br
+NSDB: nsdb.example.net:389
+.sp
+.RE
+To see real-time replication resolution results as the remote server sees them, use:
+.RS
+.sp
+$ fedfs-lookup-replication -h fs.example.net -t nsdb /export/replication1
+.br
+Server returned FEDFS_ERR_NSDB_NOFSN
+.sp
+.RE
+In this example, the replication marker exists on the file server,
+but the domain's NSDB has not yet been updated to contain a list of
+fileset locations for the UUID contained in the replication marker.
+The file server is therefore not able to resolve the replication.
+.SH SECURITY
+By default, or if the
+.B sys
+and
+.B unix
+flavors are specified with the
+.BI \-\-security= flavor
+option, the
+.BR fedfs-create-junction (8)
+command uses AUTH_SYS security for the Remote Procedure Call.
+AUTH_SYS has known weaknesses and should be avoided on untrusted networks.
+.P
+The RPC client uses the Kerberos v5 GSS mechanism
+if a Kerberos security flavor is specified.
+When specifying a Kerberos security flavor,
+the user must first obtain a valid Kerberos ticket using
+.BR kinit (1)
+before running
+.BR fedfs-create-junction (8).
+.P
+The AUTH_NONE security flavor is no longer supported by this implementation.
+.SH "SEE ALSO"
+.BR fedfs (7),
+.BR rpc.fedfsd (8),
+.BR kinit (1),
+.BR rpc (3t)
+.sp
+RFC 5716 for FedFS requirements and overview
+.SH COLOPHON
+This page is part of the fedfs-utils package.
+A description of the project and information about reporting bugs
+can be found at
+.IR http://wiki.linux-nfs.org/wiki/index.php/FedFsUtilsProject .
+.SH "AUTHOR"
+Chuck Lever <chuck.lever@oracle.com>

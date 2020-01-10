@@ -1,0 +1,275 @@
+
+			Linux FedFs Implementation
+
+
+Maintainer:	Chuck Lever <chuck.lever@oracle.com>
+Mailing list:	<fedfs-utils-devel@oss.oracle.com>
+Web site:	http://wiki.linux-nfs.org/wiki/index.php/FedFsUtilsProject
+SCM:		git://git.linux-nfs.org/projects/cel/fedfs-utils.git
+Bugzilla:	https://oss.oracle.com/bugzilla
+
+
+Release notes for fedfs-utils 0.10-rc1
+
+
+Release Quality Statement
+------- ------- ---------
+
+This is an ALPHA quality release.  The code in this release is not
+guaranteed to work.  Programming, administrative, and user interfaces
+may change significantly before the next release.  This release is
+for technology preview only.
+
+Warning: The implementation in this package is based on internet draft
+standards that are still evolving.  The current release of fedfs-utils
+may not be compatible with the next release of this package, nor with
+implementations from other vendors.
+
+
+Intellectual Property Disclaimer
+------------ -------- ----------
+
+The fedfs-utils implementation in this package is copyright 2010,
+2011, and 2012 Oracle.  Except where explicitly mentioned, all source
+code in this package is covered by version 2 of the GNU General Public
+License.  See the COPYING file for details.  A few parts are also
+covered by the IETF's code license, which is a simplified BSD license
+that is compatible with GPLv2.
+
+In addition:
+
+  IPR disclosure 1362 (http://datatracker.ietf.org/ipr/1362) discloses
+  coverage of the FedFS NSDB architecture by US Patent #5,842,214:
+  "Distributed file system providing a unified name space with
+  efficient name resolution," filed by Microsoft Corporation on
+  September 24, 1997 but never assigned.  Microsoft has released the
+  patent via a Royalty-Free, Reasonable and Non-discriminatory Licence
+  to All Implementers.
+
+  IPR disclosure 1634 (http://datatracker.ietf.org/ipr/1634) discloses
+  coverage of technology in this package by US Patent #7,933,921:
+  "Referent-controlled location resolution of resources in a federated
+  distributed system," filed on November 29, 2006 and assigned to NetApp
+  on April 26, 2011.  NetApp has released the patent via a Royalty-Free,
+  Reasonable and Non-discriminatory Licence to All Implementers.
+
+
+Package Synopsis
+------- --------
+
+This package contains an implementation for Linux of the Federated
+Filesystem (FedFS) Proposed Standard.  For an introduction to FedFS,
+see RFC 5716, or read the fedfs(7) man page provided in the doc/man
+directory.
+
+Packagers and distributors should review this entire README document
+to understand what is in this package, it's pre-requisites, and any
+security issues related to it.
+
+An attempt has been made to keep this package distribution-neutral.
+It is a source code-only package that is distributed via tarball and
+git.
+
+
+Overview
+--------
+
+The components in this package are used for managing file system
+referrals in order to create a global network file system namespace.
+
+See RFCs 3530bis and 5661 for more details on NFSv4 referrals.  SMB
+referrals are described in other documents.  At this point in time,
+this package supports only NFSv4 referrals.  SMB referrals may be
+supported in a future release.
+
+File system referrals allow a file server to direct clients to other
+servers and exports when data has been moved or replicated.  In a larger
+sense, they organize a network file system namespace across multiple
+file servers.  A federation of file servers can create a seamless global
+namespace using referrals.  No configuration changes on clients are
+required as the namespace is changed over time.
+
+
+Installable components include:
+
+   o  An automounter program map to discover the top-level directory
+      of FedFS domain namespaces
+
+   o  A mount command to mount parts of a FedFS domain namespace
+
+   o  A plug-in library that allows programs outside of FedFS to
+      resolve junctions on local file systems; a header file
+      describing the library's API is included
+
+   o  An ONC RPC service daemon that runs on file servers to enable
+      remote management of FedFS junctions
+
+   o  A tool called "nfsref" to manage local junctions without
+      requiring fedfsd.
+
+   o  A set of command-line clients that can access fedfsd instances
+      on remote file servers
+
+   o  A set of command-line clients that can manage FedFS entries on
+      an LDAP server acting as a FedFS NSDB
+
+   o  A tool to manage NSDB connection parameters on the local host
+
+   o  An LDIF format schema to enable an LDAP server to support FedFS
+      objects
+
+
+The automounter program map is a subcommand invoked by the automounter
+to locate FedFS domains and construct appropriate mount options for
+mounting domain roots.  It is used in conjunction with the Linux
+autofs facility.
+
+The mount command is a subcommand invoked by mount(8) to handle the
+housekeeping needed to find and mount part or all of FedFS domain
+namespaces.
+
+The plug-in library provides an API for resolving local junctions
+into a list of file system locations.  The API is described in a new
+header file installed in /usr/include.  A patch to mountd (nfs-utils)
+is available to support the use of this plug-in library.
+
+The fedfsd program is an RPC server that allows remote administrators to
+create FedFS junctions in local file systems.  FedFS ADMIN requests that
+can mutate local file system state are authenticated via RPCSEC GSSAPI.
+Run this program on NFS file servers that participate in a FedFS
+federation to allow the management of FedFS junctions on that server.
+The use of strong authentication (the Kerberos GSS mechanism) is highly
+encouraged when deploying an FedFS ADMIN server.
+
+The command-line clients are used by FedFS adminstrators to manage the
+state of the local FedFS federation.  These are simple clients that
+expose the raw administrative operations of FedFS, much like the bottom-
+level git commands.  Eventually we plan to create high-level clients, much
+like git porcelain, to provide some degree of automation to FedFS
+administration.
+
+The INSTALL file in this distribution explains more about how to build
+these components, and which of these components to install on what
+systems.
+
+An Installation Guide has also been provided on the project web site.
+See:
+
+  http://wiki.linux-nfs.org/wiki/index.php/FedFsInstallationGuide0.9
+
+
+Package Version
+------- -------
+
+Standard releases:
+
+	<major>.<minor>[.<maint>[.<bugfix>]]
+
+Major releases introduce new features, and may not always be backwards
+compatible with earlier releases.  Minor releases may introduce new
+features, but will be backwards compatible with earlier minor releases
+with the same major version number.
+
+While we are in alpha, that last rule will be bent or broken.
+
+
+Operational pre-requisites
+----------- --------------
+
+Linux kernel release 3.2 or later with the commit entitled "NFS: fix
+bug in legacy DNS resolver." applied.
+
+An entry for the FedFS ADMIN protocol in /etc/rpc:
+
+	fedfs_admin	100418
+
+The fedfsd program requires rpcbind and libtirpc.  It requires correctly
+configured RPCSEC GSSAPI on the system where it is running.  For example,
+to support Kerberos authentication, Kerberos configuration files have to
+be up to date, and a proper keytab must be established.
+
+Distributors should provide an appropriate init script (or equivalent)
+to ensure that fedfsd is started after a system boot.  The contrib/
+subdirectory contains samples of init scripts.
+
+The junction plug-in library requires LDAP libraries, libxml2,
+libsqlite3, liburiparser, and support for TLS (usually OpenSSL).
+
+nfs-utils release 1.2.6 or later.  mountd may need to be rebuilt on
+a system that has /usr/include/nfs-plugin.h installed, in order to
+find and execute the junction plug-in library appropriately.
+
+To store FedFS junctions, file systems with run-time support for
+extended attributes are required on FedFS-enabled file servers.
+
+libcap is required to permit rpc.fedfsd, nsdbparams, and the junction
+plug-in library to access trusted extended attributes in each file
+system.
+
+The FedFS ADMIN clients require libtirpc.  They also require correctly
+configured RPCSEC GSSAPI.  Typically Kerberos with integrity is the
+preferred authentication flavor.
+
+NSDB client components require LDAP libraries and support for TLS
+(namely, OpenSSL).
+
+NSDB connection parameter information is persistent.  The NSDB
+connection parameter database is located by default under
+/var/lib/fedfs.  The fedfsd program must have write access to this
+directory, and the junction plug-in library and the NSDB clients must
+have read access to this directory.  Usually a special user ID and
+group ID are created for this purpose.
+
+x.509 certificates for authenticating NSDB nodes are stored under
+/var/lib/fedfs/nsdbcerts, by default.  fedfsd and nsdbparams must
+have write access to this directory.  The junction plug-in library
+and the NSDB clients must have read access to this directory.
+
+
+Security considerations
+-------- --------------
+
+The FedFS network protocols employ standard network security
+mechanisms to authenticate servers and administrators.  Therefore,
+packaged support for RPCSEC GSSAPI and LDAP over TLS must be
+installed and configured correctly on the systems running these
+programs.  Further discussion of installation and configuration
+of these packages is beyond the scope of this document.
+
+FedFS ADMIN clients contact the FedFS ADMIN server using AUTH_SYS
+or RPCGSS security.  The FedFS administrator authenticates to the
+ADMIN server when performing operations that change the persistent
+state of the ADMIN and file server (eg. creating junctions or
+setting NSDB connection parameters).
+
+Before performing operations that change the persistent state of an
+NSDB node, NSDB clients should authenticate the server using the
+server's x.509 certificate.  Binding as an LDAP user with write
+authorization to the FedFS entries stored on this server is required
+for this class of operations.
+
+Operations on an NSDB node or a FedFS ADMIN service that do not
+change persistent domain state are done without authentication of
+the requestor (a domain administrator or a fileserver).  The
+requestor is not required to bind to the directory for this class
+of operations.  The requestor may authenticate the NSDB, however,
+using an x.509 certificate.
+
+The FedFS ADMIN server and the junction plug-in library both access
+FedFS junctions stored in local file systems.  These junctions are
+stored in trusted extended attributes (trusted xattrs).  The
+CAP_SYS_ADMIN capability is required for any program that accesses
+trusted xattrs.
+
+The fedfsd program is usually started by a parent process running as
+root.  Subsequently, fedfsd drops all privileges it does not require
+for normal steady state operation.  The fedfsd program is a long-
+running system service that listens on a network port and registers
+with the local rpcbind service.  Standard precautions should be taken.
+
+The junction plug-in library assumes that mountd is running as root.
+Since it only reads junctions on behalf of mountd, this should typically
+be secure against network attack.
+
+As a consequence of their privilege requirements, these programs must
+be registered with local security auditing subsystems such as SELinux.
