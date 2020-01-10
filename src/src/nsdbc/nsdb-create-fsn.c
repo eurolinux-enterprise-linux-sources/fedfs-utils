@@ -110,10 +110,10 @@ main(int argc, char **argv)
 {
 	char *progname, *binddn, *nsdbname, *endptr;
 	unsigned short nsdbport;
+	unsigned int ttl, ldap_err;
 	char *nce, *fsn_uuid;
 	FedFsStatus retval;
 	unsigned long tmp;
-	unsigned int ttl;
 	nsdb_t host;
 	int arg;
 
@@ -170,11 +170,10 @@ main(int argc, char **argv)
 			}
 			ttl = (unsigned int)tmp;
 			break;
-		case '?':
-			nsdb_create_fsn_usage(progname);
 		default:
 			fprintf(stderr, "Invalid command line "
 				"argument: %c\n", (char)arg);
+		case '?':
 			nsdb_create_fsn_usage(progname);
 		}
 	}
@@ -225,7 +224,7 @@ main(int argc, char **argv)
 		goto out_free;
 	}
 
-	retval = nsdb_open_nsdb(host, binddn, NULL);
+	retval = nsdb_open_nsdb(host, binddn, NULL, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		break;
@@ -241,14 +240,14 @@ main(int argc, char **argv)
 			"to NSDB %s:%u\n", nsdbname, nsdbport);
 		goto out_free;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
-		switch (nsdb_ldaperr(host)) {
+		switch (ldap_err) {
 		case LDAP_INVALID_CREDENTIALS:
 			fprintf(stderr, "Incorrect password for DN %s\n",
 				binddn);
 			break;
 		default:
 			fprintf(stderr, "Failed to bind to NSDB %s:%u: %s\n",
-				nsdbname, nsdbport, nsdb_ldaperr2string(host));
+				nsdbname, nsdbport, ldap_err2string(ldap_err));
 		}
 		goto out_free;
 	default:
@@ -258,7 +257,7 @@ main(int argc, char **argv)
 		goto out_free;
 	}
 
-	retval = nsdb_create_fsn_s(host, nce, fsn_uuid, ttl);
+	retval = nsdb_create_fsn_s(host, nce, fsn_uuid, ttl, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		printf("Successfully created FSN record for %s under %s\n",
@@ -272,7 +271,7 @@ main(int argc, char **argv)
 			fprintf(stderr, "NCE %s does not exist\n", nce);
 		break;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
-		switch (nsdb_ldaperr(host)) {
+		switch (ldap_err) {
 		case LDAP_REFERRAL:
 			fprintf(stderr, "Encountered LDAP referral on %s:%u\n",
 				nsdbname, nsdbport);
@@ -283,7 +282,7 @@ main(int argc, char **argv)
 			break;
 		default:
 			fprintf(stderr, "Failed to create FSN: %s\n",
-				nsdb_ldaperr2string(host));
+				ldap_err2string(ldap_err));
 		}
 		break;
 	default:

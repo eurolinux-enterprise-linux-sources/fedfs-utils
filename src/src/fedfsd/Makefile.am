@@ -26,15 +26,14 @@
 noinst_HEADERS		= fedfsd.h
 RPCPREFIX		= rpc.
 sbin_PROGRAMS		= fedfsd
-fedfsd_SOURCES		= access.c gss.c listen.c main.c privilege.c svc.c
+fedfsd_SOURCES		= listen.c main.c privilege.c svc.c
 fedfsd_LDADD		= $(top_builddir)/src/libadmin/libadmin.la \
 			  $(top_builddir)/src/libnsdb/libnsdb.la \
 			  $(top_builddir)/src/libjunction/libjunction.la \
 			  $(top_builddir)/src/libxlog/libxlog.la \
 			  $(LIBTIRPC) $(LIBLDAP) $(LIBLBER) $(LIBXML2) \
 			  $(LIBSQLITE3) $(LIBIDN) $(LIBUUID) $(LIBCAP) \
-			  $(LIBURIPARSER) $(LIBCRYPTO) $(LIBSSL) \
-			  $(LIBCONFIG) $(LIBGSSAPI_KRB5)
+			  $(LIBURIPARSER) $(LIBCRYPTO) $(LIBSSL)
 
 CLEANFILES		= cscope.in.out cscope.out cscope.po.out *~
 DISTCLEANFILES		= Makefile.in
@@ -43,7 +42,6 @@ AM_CFLAGS		= -ggdb -fstrict-aliasing \
 			  -Wall -Wextra -pedantic -Wformat=2 \
 			  -Wstrict-aliasing=2 -Wp,-D_FORTIFY_SOURCE=2
 AM_CPPFLAGS		= -I. -I$(top_srcdir)/src/include -I/usr/include/tirpc
-AM_LDFLAGS		= -Wl,--as-needed
 
 #######################################################################
 # The following allows the current practice of having

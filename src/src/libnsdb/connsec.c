@@ -42,7 +42,7 @@
 void
 nsdb_connsec_crypto_startup(void)
 {
-	xlog(D_CALL, "%s", __func__);
+	xlog(D_CALL, "%s");
 
 	CRYPTO_malloc_init();
 	ERR_load_crypto_strings();
@@ -56,7 +56,7 @@ nsdb_connsec_crypto_startup(void)
 void
 nsdb_connsec_crypto_shutdown(void)
 {
-	xlog(D_CALL, "%s", __func__);
+	xlog(D_CALL, "%s");
 
 	OBJ_cleanup();
 	EVP_cleanup();
@@ -169,8 +169,10 @@ nsdb_connsec_read_bio_x509(const char *certfile, BIO *bio,
 		return retval;
 
 	buf = (unsigned char *)calloc(1, size);
-	if (buf == NULL)
+	if (buf == NULL) {
+		xlog(D_GENERAL, "%s: failed to allocate buffer", __func__);
 		return FEDFS_ERR_SVRFAULT;
+	}
 
 	retval = nsdb_connsec_read_bio_x509_buf(certfile, bio, buf);
 	if (retval != FEDFS_OK) {

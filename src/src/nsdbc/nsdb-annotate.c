@@ -109,6 +109,7 @@ main(int argc, char **argv)
 	char *progname, *binddn, *nsdbname;
 	char *keyword, *value, *entry, *annotation;
 	unsigned short nsdbport;
+	unsigned int ldap_err;
 	FedFsStatus retval;
 	_Bool delete;
 	nsdb_t host;
@@ -166,6 +167,7 @@ main(int argc, char **argv)
 			break;
 		case '?':
 			nsdb_annotate_usage(progname);
+			break;
 		default:
 			fprintf(stderr, "Invalid command line "
 				"argument: %c\n", (char)arg);
@@ -242,7 +244,7 @@ main(int argc, char **argv)
 		goto out_free;
 	}
 
-	retval = nsdb_open_nsdb(host, binddn, NULL);
+	retval = nsdb_open_nsdb(host, binddn, NULL, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		break;
@@ -258,14 +260,14 @@ main(int argc, char **argv)
 			"to NSDB %s:%u\n", nsdbname, nsdbport);
 		goto out_free;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
-		switch (nsdb_ldaperr(host)) {
+		switch (ldap_err) {
 		case LDAP_INVALID_CREDENTIALS:
 			fprintf(stderr, "Incorrect password for DN %s\n",
 				binddn);
 			break;
 		default:
 			fprintf(stderr, "Failed to bind to NSDB %s:%u: %s\n",
-				nsdbname, nsdbport, nsdb_ldaperr2string(host));
+				nsdbname, nsdbport, ldap_err2string(ldap_err));
 		}
 		goto out_free;
 	default:
@@ -276,7 +278,8 @@ main(int argc, char **argv)
 	}
 
 	if (delete)
-		retval = nsdb_annotation_delete_s(host, entry, annotation);
+		retval = nsdb_annotation_delete_s(host, entry, annotation,
+							&ldap_err);
 	else {
 		if (annotation == NULL) {
 			retval = nsdb_construct_annotation(keyword, value,
@@ -287,10 +290,12 @@ main(int argc, char **argv)
 				goto out_close;
 			}
 
-			retval = nsdb_annotation_add_s(host, entry, annotation);
+			retval = nsdb_annotation_add_s(host, entry,
+							annotation, &ldap_err);
 			free(annotation);
 		} else
-			retval = nsdb_annotation_add_s(host, entry, annotation);
+			retval = nsdb_annotation_add_s(host, entry,
+							annotation, &ldap_err);
 	}
 	switch (retval) {
 	case FEDFS_OK:
@@ -299,7 +304,7 @@ main(int argc, char **argv)
 			delete ? "from" : "for", entry);
 		break;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
-		switch (nsdb_ldaperr(host)) {
+		switch (ldap_err) {
 		case LDAP_REFERRAL:
 			fprintf(stderr, "Encountered LDAP referral on %s:%u\n",
 				nsdbname, nsdbport);
@@ -315,7 +320,7 @@ main(int argc, char **argv)
 		default:
 			fprintf(stderr, "Failed to %s annotation \"%s\" = \"%s\": %s\n",
 				delete ? "remove" : "update",
-				keyword, value, nsdb_ldaperr2string(host));
+				keyword, value, ldap_err2string(ldap_err));
 		}
 		break;
 	default:

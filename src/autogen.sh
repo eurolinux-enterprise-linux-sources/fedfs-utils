@@ -57,8 +57,8 @@ if test x"${1}" = x"clean"; then
   exit
 fi
 
-libtoolize --force --copy --install
 aclocal
+libtoolize --force --copy --install
 autoheader
 automake --add-missing --copy --gnu
 autoconf

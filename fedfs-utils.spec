@@ -1,41 +1,36 @@
 Name:           fedfs-utils
-Version:        0.10.5
-Release:        0%{?dist}
+Version:        0.9.2
+Release:        2%{?dist}
 Summary:        Utilities for mounting and managing FedFS
 
 Group:          System Environment/Daemons
 License:        GPLv2
 URL:            http://wiki.linux-nfs.org/wiki/index.php/FedFsUtilsProject
 BuildRequires:  libidn-devel libattr-devel libcap-devel openldap-devel
-BuildRequires:  sqlite-devel libtirpc-devel libuuid-devel libconfig-devel
+BuildRequires:  sqlite-devel libtirpc-devel libuuid-devel systemd-units
 BuildRequires:  openssl-devel libxml2-devel uriparser-devel
-BuildRequires:  automake libtool glibc-headers
-BuildRequires:  python2-devel
-BuildRequires:  systemd systemd-units
 
 Source0:        http://oss.oracle.com/projects/%{name}/dist/files/%{name}-%{version}.tar.gz
 
-%global _hardened_build 1
 %global unit_name rpcfedfsd
-# %define debug_package %{nil}
+%define debug_package %{nil}
 
 %description
 RFC 5716 introduces the Federated File System (FedFS, for short). FedFS
 is an extensible standardized mechanism by which system administrators
-construct a coherent file name space across multiple file servers using
-file system referrals.
+construct a coherent namespace across multiple file servers using file
+system referrals.
 
 A file system referral is like a symbolic link to another file system
 share, but it is not visible to applications. It behaves like an
-auto-mounted directory where a new file system mount is done when an
+automounted directory where a new file system mount is done when an
 application first accesses that directory. The arguments of the mount
 operation are controlled by information returned by the file server.
 
 Today, file system referral mechanisms exist in several network file
-system protocols. FedFS provides its file name space features by
-leveraging referral mechanisms already built in to network file system
-protocols.  Thus no change to file system protocols or clients is
-required.
+system protocols. FedFS provides its namespace features by leveraging
+referral mechanisms already built in to network file system protocols.
+Thus no change to file system protocols or clients is required.
 
 Currently, the Linux FedFS implementation supports only NFS version 4
 referrals. More on NFS version 4 referrals can be found in RFC 3530.
@@ -45,21 +40,10 @@ FedFS may support other network file system protocols in the future.
 %setup -q -n %{name}-%{version}
 
 %build
-%ifarch s390 s390x
-PIE="-fPIE"
-%else
-PIE="-fpie"
-%endif
-export PIE
-export CFLAGS="$RPM_OPT_FLAGS $ARCH_OPT_FLAGS $PIE"
-export LDFLAGS="-pie -Wl,-z,relro -Wl,-z,now"
-
-./autogen.sh
 %configure --prefix=/usr
 make %{?_smp_mflags}
 
 %install
-# make install-strip DESTDIR=%{buildroot}
 make install DESTDIR=%{buildroot}
 mkdir -p %{buildroot}%{_sharedstatedir}/fedfs
 mkdir -p %{buildroot}%{_unitdir}
@@ -67,10 +51,8 @@ mkdir -p %{buildroot}/nfs4
 install -m 644 contrib/init/%{unit_name}.service %{buildroot}%{_unitdir}
 mkdir -p %{buildroot}%{_sysconfdir}/sysconfig
 install -m 644 contrib/init/fedfs %{buildroot}%{_sysconfdir}/sysconfig
-mkdir -p %{buildroot}/%{_sysconfdir}/auto.master.d
-install -m 644 contrib/init/fedfs.autofs %{buildroot}/%{_sysconfdir}/auto.master.d
-mkdir -p %{buildroot}/%{_sysconfdir}/fedfsd
-mv %{buildroot}/%{_sysconfdir}/access.conf %{buildroot}/%{_sysconfdir}/fedfsd
+mkdir -p %{buildroot}/etc/auto.master.d
+install -m 644 contrib/init/fedfs.autofs %{buildroot}/etc/auto.master.d
 
 # Don't package static libs to encourage use of shared library.
 rm -f %{buildroot}%{_libdir}/libnfsjunct.a
@@ -79,34 +61,32 @@ rm -f %{buildroot}%{_libdir}/libnfsjunct.la
 %package common
 Summary:      Common files for FedFS
 Group:        System Environment/Daemons
-BuildArch:    noarch
-
+BuildArch: noarch
 %description common
 This package contains files common to all of the fedfs packages.
 
 RFC 5716 introduces the Federated File System (FedFS, for short). FedFS
 is an extensible standardized mechanism by which system administrators
-construct a coherent file name space across multiple file servers using
-file system referrals.
+construct a coherent namespace across multiple file servers using file
+system referrals.
 
 A file system referral is like a symbolic link to another file system
 share, but it is not visible to applications. It behaves like an
-auto-mounted directory where a new file system mount is done when an
+automounted directory where a new file system mount is done when an
 application first accesses that directory. The arguments of the mount
 operation are controlled by information returned by the file server.
 
 Today, file system referral mechanisms exist in several network file
-system protocols. FedFS provides its file name space features by
-leveraging referral mechanisms already built in to network file system
-protocols.  Thus no change to file system protocols or clients is
-required.
+system protocols. FedFS provides its namespace features by leveraging
+referral mechanisms already built in to network file system protocols.
+Thus no change to file system protocols or clients is required.
 
 Currently, the Linux FedFS implementation supports only NFS version 4
 referrals. More on NFS version 4 referrals can be found in RFC 3530.
 FedFS may support other network file system protocols in the future.
 
 %files common
-%doc COPYING README ChangeLog doc/ldap/fedfs.schema doc/ldap/fedfs-schema.ldif
+%doc COPYING README INSTALL ChangeLog doc/ldap/fedfs.schema doc/ldap/fedfs-schema.ldif
 %{_mandir}/man7/fedfs.7.*
 
 %package client
@@ -122,20 +102,19 @@ as a client.
 
 RFC 5716 introduces the Federated File System (FedFS, for short). FedFS
 is an extensible standardized mechanism by which system administrators
-construct a coherent file name space across multiple file servers using
-file system referrals.
+construct a coherent namespace across multiple file servers using file
+system referrals.
 
 A file system referral is like a symbolic link to another file system
 share, but it is not visible to applications. It behaves like an
-auto-mounted directory where a new file system mount is done when an
+automounted directory where a new file system mount is done when an
 application first accesses that directory. The arguments of the mount
 operation are controlled by information returned by the file server.
 
 Today, file system referral mechanisms exist in several network file
-system protocols. FedFS provides its file name space features by
-leveraging referral mechanisms already built in to network file system
-protocols.  Thus no change to file system protocols or clients is
-required.
+system protocols. FedFS provides its namespace features by leveraging
+referral mechanisms already built in to network file system protocols.
+Thus no change to file system protocols or clients is required.
 
 Currently, the Linux FedFS implementation supports only NFS version 4
 referrals. More on NFS version 4 referrals can be found in RFC 3530.
@@ -147,7 +126,7 @@ FedFS may support other network file system protocols in the future.
 %{_mandir}/man8/mount.fedfs.8.*
 %{_mandir}/man8/fedfs-map-nfs4.8.*
 %dir /nfs4
-%config(noreplace) /%{_sysconfdir}/auto.master.d/fedfs.autofs
+%config(noreplace) /etc/auto.master.d/fedfs.autofs
 
 %post client
 # We may have changed the automounter configuration
@@ -168,20 +147,19 @@ and domain administration.
 
 RFC 5716 introduces the Federated File System (FedFS, for short). FedFS
 is an extensible standardized mechanism by which system administrators
-construct a coherent file name space across multiple file servers using
-file system referrals.
+construct a coherent namespace across multiple file servers using file
+system referrals.
 
 A file system referral is like a symbolic link to another file system
 share, but it is not visible to applications. It behaves like an
-auto-mounted directory where a new file system mount is done when an
+automounted directory where a new file system mount is done when an
 application first accesses that directory. The arguments of the mount
 operation are controlled by information returned by the file server.
 
 Today, file system referral mechanisms exist in several network file
-system protocols. FedFS provides its file name space features by
-leveraging referral mechanisms already built in to network file system
-protocols.  Thus no change to file system protocols or clients is
-required.
+system protocols. FedFS provides its namespace features by leveraging
+referral mechanisms already built in to network file system protocols.
+Thus no change to file system protocols or clients is required.
 
 Currently, the Linux FedFS implementation supports only NFS version 4
 referrals. More on NFS version 4 referrals can be found in RFC 3530.
@@ -203,20 +181,19 @@ NFS and FedFS junction support to be enabled in nfs-utils.
 
 RFC 5716 introduces the Federated File System (FedFS, for short). FedFS
 is an extensible standardized mechanism by which system administrators
-construct a coherent file name space across multiple file servers using
-file system referrals.
+construct a coherent namespace across multiple file servers using file
+system referrals.
 
 A file system referral is like a symbolic link to another file system
 share, but it is not visible to applications. It behaves like an
-auto-mounted directory where a new file system mount is done when an
+automounted directory where a new file system mount is done when an
 application first accesses that directory. The arguments of the mount
 operation are controlled by information returned by the file server.
 
 Today, file system referral mechanisms exist in several network file
-system protocols. FedFS provides its file name space features by
-leveraging referral mechanisms already built in to network file system
-protocols.  Thus no change to file system protocols or clients is
-required.
+system protocols. FedFS provides its namespace features by leveraging
+referral mechanisms already built in to network file system protocols.
+Thus no change to file system protocols or clients is required.
 
 Currently, the Linux FedFS implementation supports only NFS version 4
 referrals. More on NFS version 4 referrals can be found in RFC 3530.
@@ -230,8 +207,6 @@ Summary:      The FedFS nfs-plugin run-time library
 Group:        System Environment/Daemons
 Requires:     %{name}-common = %{version}-%{release}
 Requires:     %{name}-nsdbparams%{?_isa} = %{version}-%{release}
-Requires:     nfs-utils >= 1.2.8
-Requires:     kernel >= 3.3.0
 %description lib
 This package contains the FedFS nfs-plugin run-time library.  This
 package must be installed for FedFS junction support to be enabled in
@@ -239,20 +214,19 @@ rpc.mountd.
 
 RFC 5716 introduces the Federated File System (FedFS, for short). FedFS
 is an extensible standardized mechanism by which system administrators
-construct a coherent file name space across multiple file servers using
-file system referrals.
+construct a coherent namespace across multiple file servers using file
+system referrals.
 
 A file system referral is like a symbolic link to another file system
 share, but it is not visible to applications. It behaves like an
-auto-mounted directory where a new file system mount is done when an
+automounted directory where a new file system mount is done when an
 application first accesses that directory. The arguments of the mount
 operation are controlled by information returned by the file server.
 
 Today, file system referral mechanisms exist in several network file
-system protocols. FedFS provides its file name space features by
-leveraging referral mechanisms already built in to network file system
-protocols.  Thus no change to file system protocols or clients is
-required.
+system protocols. FedFS provides its namespace features by leveraging
+referral mechanisms already built in to network file system protocols.
+Thus no change to file system protocols or clients is required.
 
 Currently, the Linux FedFS implementation supports only NFS version 4
 referrals. More on NFS version 4 referrals can be found in RFC 3530.
@@ -268,76 +242,36 @@ FedFS may support other network file system protocols in the future.
 %{_libdir}/libnfsjunct.so
 %{_libdir}/libnfsjunct.so.*
 
-%package python
-Summary:      FedFS Python utilities
-Group:        System Environment/Daemons
-BuildArch:    noarch
-Requires:     python-ldap openldap-servers
-
-%description python
-This package contains Python tools for administering the FedFS
-capabilities of a Linux NFS file server.
-
-RFC 5716 introduces the Federated File System (FedFS, for short). FedFS
-is an extensible standardized mechanism by which system administrators
-construct a coherent file name space across multiple file servers using
-file system referrals.
-
-A file system referral is like a symbolic link to another file system
-share, but it is not visible to applications. It behaves like an
-auto-mounted directory where a new file system mount is done when an
-application first accesses that directory. The arguments of the mount
-operation are controlled by information returned by the file server.
-
-Today, file system referral mechanisms exist in several network file
-system protocols. FedFS provides its file name space features by
-leveraging referral mechanisms already built in to network file system
-protocols.  Thus no change to file system protocols or clients is
-required.
-
-Currently, the Linux FedFS implementation supports only NFS version 4
-referrals. More on NFS version 4 referrals can be found in RFC 3530.
-FedFS may support other network file system protocols in the future.
-
-%files python
-%{_bindir}/fedfs-domainroot
-%{_bindir}/nsdb-jumpstart
-%{python_sitelib}/PyFedfs/*
-%{_mandir}/man8/fedfs-domainroot.8.*
-%{_mandir}/man8/nsdb-jumpstart.8.*
-
 %package server
 Summary:      Utilities for serving FedFS domains
 Group:        System Environment/Daemons
 Requires:     %{name}-common = %{version}-%{release}
 Requires:     %{name}-nsdbparams%{?_isa} = %{version}-%{release}
 Requires:     %{name}-lib%{?_isa} = %{version}-%{release}
-Requires:     nfs-utils >= 1.2.8
-Requires:     kernel >= 3.3.0
+Requires:     nfs-utils
 Requires(post):   systemd-units
 Requires(preun):  systemd-units
 Requires(postun): systemd-units
 
 %description server
 This package contains tools for managing NFS and FedFS junctions
-on a Linux NFS file server.
+on a Linux NFS fileserver.
 
 RFC 5716 introduces the Federated File System (FedFS, for short). FedFS
 is an extensible standardized mechanism by which system administrators
-construct a coherent file name space across multiple file servers using
-file system referrals.
+construct a coherent namespace across multiple file servers using file
+system referrals.
 
 A file system referral is like a symbolic link to another file system
 share, but it is not visible to applications. It behaves like an
-auto-mounted directory where a new file system mount is done when an
+automounted directory where a new file system mount is done when an
 application first accesses that directory. The arguments of the mount
 operation are controlled by information returned by the file server.
 
 Today, file system referral mechanisms exist in several network file
-system protocols. FedFS provides its file name space features by
-leveraging referral mechanisms already built in to network file system
-protocols.  Thus no change to file system protocols or clients is
-required.
+system protocols. FedFS provides its namespace features by leveraging
+referral mechanisms already built in to network file system protocols.
+Thus no change to file system protocols or clients is required.
 
 Currently, the Linux FedFS implementation supports only NFS version 4
 referrals. More on NFS version 4 referrals can be found in RFC 3530.
@@ -361,14 +295,12 @@ exit 0
 
 %files server
 %dir %{_sharedstatedir}/fedfs
-%dir %{_sysconfdir}/fedfsd
 %{_sbindir}/nfsref
 %{_sbindir}/rpc.fedfsd
-%{_mandir}/man8/nfsref.8.*
 %{_mandir}/man8/rpc.fedfsd.8.*
+%{_mandir}/man8/nfsref.8.gz
 %{_unitdir}/rpcfedfsd.service
 %config(noreplace) %{_sysconfdir}/sysconfig/fedfs
-%config(noreplace) %{_sysconfdir}/fedfsd/access.conf
 
 %package admin
 Summary:      Utilities for administering FedFS domains
@@ -380,20 +312,19 @@ This package contains the tools needed to manage a FedFS domain.
 
 RFC 5716 introduces the Federated File System (FedFS, for short). FedFS
 is an extensible standardized mechanism by which system administrators
-construct a coherent file name space across multiple file servers using
-file system referrals.
+construct a coherent namespace across multiple file servers using file
+system referrals.
 
 A file system referral is like a symbolic link to another file system
 share, but it is not visible to applications. It behaves like an
-auto-mounted directory where a new file system mount is done when an
+automounted directory where a new file system mount is done when an
 application first accesses that directory. The arguments of the mount
 operation are controlled by information returned by the file server.
 
 Today, file system referral mechanisms exist in several network file
-system protocols. FedFS provides its file name space features by
-leveraging referral mechanisms already built in to network file system
-protocols.  Thus no change to file system protocols or clients is
-required.
+system protocols. FedFS provides its namespace features by leveraging
+referral mechanisms already built in to network file system protocols.
+Thus no change to file system protocols or clients is required.
 
 Currently, the Linux FedFS implementation supports only NFS version 4
 referrals. More on NFS version 4 referrals can be found in RFC 3530.
@@ -424,25 +355,6 @@ FedFS may support other network file system protocols in the future.
 %{_mandir}/man8/nsdb-*
 
 %changelog
-* Wed Apr  6 2016 Steve Dickson <steved@redhat.com> - 0.10.5-0
-- Updated to latest upstream release: 0.10.5 (bz 1277221)
-
-* Wed Oct 22 2014 Steve Dickson <steved@redhat.com> - 0.10.3-2
-- Reworked CFLAGS to put back execshield (bz 983257)
-
-* Tue Oct 21 2014 Steve Dickson <steved@redhat.com> - 0.10.3-1
-- Updated to latest upstream release: 0.10.3 (bz 1110228)
-- Added the PIE and RELRO CFLAGS (bz 983257)
-
-* Sat Mar  8 2014 Steve Dickson <steved@redhat.com> - 0.10.0-1
-- Updated to latest upstream release: 0.10.0 (bz 1069971)
-
-* Fri Jan 24 2014 Daniel Mach <dmach@redhat.com> - 0.9.2-4
-- Mass rebuild 2014-01-24
-
-* Fri Dec 27 2013 Daniel Mach <dmach@redhat.com> - 0.9.2-3
-- Mass rebuild 2013-12-27
-
 * Wed Jul 10 2013 Chuck Lever <chuck.lever@oracle.com> - 0.9.2-2
 - nfs-utils is required for -client and -server operation
 - fedfs-utils-server requires fedfs-utils-lib to resolve junctions
@@ -502,7 +414,7 @@ FedFS may support other network file system protocols in the future.
 * Mon Dec 5 2011 Ian Kent <ikent@redhat.com> 0.7.3-2
 - add systemd-units to BuildRequires as per systemd doco.
 
-* Wed Nov 30 2011 Jeff Layton <jlayton@redhat.com> 0.7.3-1
+* Fri Nov 30 2011 Jeff Layton <jlayton@redhat.com> 0.7.3-1
 - update to 0.7.3 release
 
 * Fri Nov 04 2011 Jeff Layton <jlayton@redhat.com> 0.7.2-1

@@ -101,6 +101,7 @@ static FedFsStatus
 nfsref_remove_delete_fsn(const char *junct_path)
 {
 	char *fsn_uuid = NULL;
+	unsigned int ldap_err;
 	char *binddn, *nce;
 	FedFsStatus retval;
 	nsdb_t host;
@@ -135,7 +136,7 @@ nfsref_remove_delete_fsn(const char *junct_path)
 		goto out_free;
 	}
 
-	retval = nsdb_open_nsdb(host, binddn, NULL);
+	retval = nsdb_open_nsdb(host, binddn, NULL, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		break;
@@ -151,7 +152,7 @@ nfsref_remove_delete_fsn(const char *junct_path)
 			"to NSDB %s:%u", nsdb_hostname(host), nsdb_port(host));
 		goto out_free;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
-		switch (nsdb_ldaperr(host)) {
+		switch (ldap_err) {
 		case LDAP_INVALID_CREDENTIALS:
 			xlog(L_ERROR, "Incorrect password for DN %s",
 				binddn);
@@ -159,7 +160,7 @@ nfsref_remove_delete_fsn(const char *junct_path)
 		default:
 			xlog(L_ERROR, "Failed to bind to NSDB %s:%u: %s",
 				nsdb_hostname(host), nsdb_port(host),
-				nsdb_ldaperr2string(host));
+				ldap_err2string(ldap_err));
 		}
 		goto out_free;
 	default:
@@ -169,14 +170,18 @@ nfsref_remove_delete_fsn(const char *junct_path)
 		goto out_free;
 	}
 
-	retval = nsdb_delete_fsn_s(host, nce, fsn_uuid, false);
+	retval = nsdb_delete_fsn_s(host, nce, fsn_uuid, false, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		printf("Successfully deleted FSL records for FSN %s under %s\n",
 			fsn_uuid, nce);
 		break;
 	case FEDFS_ERR_NSDB_NONCE:
-		xlog(L_ERROR, "NCE %s does not exist", nce);
+		if (nce == NULL)
+			xlog(L_ERROR, "NSDB %s:%u has no NCE",
+				nsdb_hostname(host), nsdb_port(host));
+		else
+			xlog(L_ERROR, "NCE %s does not exist", nce);
 		break;
 	case FEDFS_ERR_NSDB_NOFSN:
 		xlog(L_ERROR, "NSDB %s:%u has no such FSN %s",
@@ -186,7 +191,7 @@ nfsref_remove_delete_fsn(const char *junct_path)
 		xlog(L_ERROR, "FSN %s still has FSL entries", fsn_uuid);
 		break;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
-		switch (nsdb_ldaperr(host)) {
+		switch (ldap_err) {
 		case LDAP_REFERRAL:
 			xlog(L_ERROR, "Encountered LDAP referral on %s:%u",
 				nsdb_hostname(host), nsdb_port(host));
@@ -201,7 +206,7 @@ nfsref_remove_delete_fsn(const char *junct_path)
 			break;
 		default:
 			xlog(L_ERROR, "Failed to delete FSN %s: %s",
-				fsn_uuid, ldap_err2string(nsdb_ldaperr(host)));
+				fsn_uuid, ldap_err2string(ldap_err));
 		}
 		break;
 	default:

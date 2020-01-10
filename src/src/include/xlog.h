@@ -12,7 +12,8 @@
 
 #include <stdarg.h>
 
-/* These are logged always. */
+/* These are logged always. L_FATAL also does exit(1) */
+#define L_FATAL		0x0100
 #define L_ERROR		0x0200
 #define L_WARNING	0x0400
 #define L_NOTICE	0x0800
@@ -46,6 +47,7 @@ void	xlog_sconfig(char *, int on);
 int	xlog_enabled(int fac);
 void	xlog(int fac, const char *fmt, ...);
 void	xlog_warn(const char *fmt, ...);
+void	xlog_err(const char *fmt, ...);
 void	xlog_backend(int fac, const char *fmt, va_list args);
 
 #endif	/* !_FEDFS_XLOG_H_ */

@@ -9,7 +9,7 @@ SCM:		git://git.linux-nfs.org/projects/cel/fedfs-utils.git
 Bugzilla:	https://oss.oracle.com/bugzilla
 
 
-Release notes for fedfs-utils 0.10.5
+Release notes for fedfs-utils 0.9.2
 
 
 Release Quality Statement
@@ -19,6 +19,13 @@ This is an ALPHA quality release.  The code in this release is not
 guaranteed to work.  Programming, administrative, and user interfaces
 may change significantly before the next release.  This release is
 for technology preview only.
+
+Warning: This package installs an externally visible RPC service that
+allows creation and deletion of directories on all areas of a fileserver.
+The security features of the FedFS ADMIN server code (RPCSEC GSSAPI)
+have not yet been implemented.  Until these features are implemented,
+use careful judgement about deploying the FedFS ADMIN RPC service daemon
+on production file servers.
 
 Warning: The implementation in this package is based on internet draft
 standards that are still evolving.  The current release of fedfs-utils
@@ -135,11 +142,10 @@ is available to support the use of this plug-in library.
 
 The fedfsd program is an RPC server that allows remote administrators to
 create FedFS junctions in local file systems.  FedFS ADMIN requests that
-can mutate local file system state are authenticated via RPCSEC GSSAPI.
-Run this program on NFS file servers that participate in a FedFS
-federation to allow the management of FedFS junctions on that server.
-The use of strong authentication (the Kerberos GSS mechanism) is highly
-encouraged when deploying an FedFS ADMIN server.
+can mutate local file system state are authenticated via RPCSEC GSSAPI
+(not yet implemented).  Run this program on NFS file servers that
+participate in a FedFS federation to allow the management of FedFS
+junctions on that server.
 
 The command-line clients are used by FedFS adminstrators to manage the
 state of the local FedFS federation.  These are simple clients that
@@ -183,10 +189,11 @@ An entry for the FedFS ADMIN protocol in /etc/rpc:
 
 	fedfs_admin	100418
 
-The fedfsd program requires rpcbind and libtirpc.  It requires correctly
-configured RPCSEC GSSAPI on the system where it is running.  For example,
-to support Kerberos authentication, Kerberos configuration files have to
-be up to date, and a proper keytab must be established.
+The fedfsd program requires rpcbind and libtirpc.  In the future, it
+will also require correctly configured RPCSEC GSSAPI on the system
+where it is running.  For example, to support Kerberos authentication,
+Kerberos configuration files would have to be up to date, and a proper
+keytab must be established.
 
 Distributors should provide an appropriate init script (or equivalent)
 to ensure that fedfsd is started after a system boot.  The contrib/
@@ -206,9 +213,9 @@ libcap is required to permit rpc.fedfsd, nsdbparams, and the junction
 plug-in library to access trusted extended attributes in each file
 system.
 
-The FedFS ADMIN clients require libtirpc.  They also require correctly
-configured RPCSEC GSSAPI.  Typically Kerberos with integrity is the
-preferred authentication flavor.
+The FedFS ADMIN clients require libtirpc.  In the future, they will
+also require correctly configured RPCSEC GSSAPI (usually Kerberos is
+the preferred authentication flavor).
 
 NSDB client components require LDAP libraries and support for TLS
 (namely, OpenSSL).
@@ -231,16 +238,18 @@ Security considerations
 
 The FedFS network protocols employ standard network security
 mechanisms to authenticate servers and administrators.  Therefore,
-packaged support for RPCSEC GSSAPI and LDAP over TLS must be
-installed and configured correctly on the systems running these
-programs.  Further discussion of installation and configuration
-of these packages is beyond the scope of this document.
+packaged support for RPCSEC GSSAPI (in the future) and LDAP over TLS
+must be installed and configured correctly on the systems running
+these programs.  Further discussion of installation and configuration
+of these packages is beyond the scope of this document.  (To do:
+implement RPCSEC GSSAPI support).
 
-FedFS ADMIN clients contact the FedFS ADMIN server using AUTH_SYS
-or RPCGSS security.  The FedFS administrator authenticates to the
-ADMIN server when performing operations that change the persistent
-state of the ADMIN and file server (eg. creating junctions or
-setting NSDB connection parameters).
+FedFS ADMIN clients contact the FedFS ADMIN server with no
+authentication today, but in the future will use RPCGSS security.
+The FedFS administrator will authenticate to the ADMIN server when
+performing operations that change the persistent state of the ADMIN
+and file server (eg. creating junctions or setting NSDB connection
+parameters).
 
 Before performing operations that change the persistent state of an
 NSDB node, NSDB clients should authenticate the server using the

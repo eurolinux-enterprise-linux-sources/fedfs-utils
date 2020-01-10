@@ -4,7 +4,7 @@
  */
 
 /*
- * Copyright 2010, 2013 Oracle.  All rights reserved.
+ * Copyright 2010 Oracle.  All rights reserved.
  *
  * This file is part of fedfs-utils.
  *
@@ -28,25 +28,31 @@
 
 #include <string.h>
 #include <stdbool.h>
-#include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
 #include <getopt.h>
 #include <locale.h>
 
+#include <rpc/clnt.h>
+#include <ldap.h>
+
 #include "fedfs.h"
 #include "fedfs_admin.h"
-#include "admin.h"
 #include "nsdb.h"
 #include "junction.h"
 #include "xlog.h"
 #include "gpl-boiler.h"
 
 /**
+ * Default RPC request timeout
+ */
+static struct timeval fedfs_get_nsdb_params_timeout = { 25, 0 };
+
+/**
  * Short form command line options
  */
-static const char fedfs_get_nsdb_params_opts[] = "?df:h:l:n:r:s:";
+static const char fedfs_get_nsdb_params_opts[] = "?df:h:l:n:r:";
 
 /**
  * Long form command line options
@@ -59,7 +65,6 @@ static const struct option fedfs_get_nsdb_params_longopts[] = {
 	{ "nsdbname", 1, NULL, 'l', },
 	{ "nettype", 1, NULL, 'n', },
 	{ "nsdbport", 1, NULL, 'r', },
-	{ "security", 1, NULL, 's', },
 	{ NULL, 0, NULL, 0, },
 };
 
@@ -67,9 +72,8 @@ static const struct option fedfs_get_nsdb_params_longopts[] = {
  * Display program synopsis
  *
  * @param progname NUL-terminated C string containing name of program
- * @return program exit status
  */
-static int
+static void
 fedfs_get_nsdb_params_usage(const char *progname)
 {
 	fprintf(stderr, "\n%s version " VERSION "\n", progname);
@@ -84,25 +88,34 @@ fedfs_get_nsdb_params_usage(const char *progname)
 	fprintf(stderr, "\t-h, --hostname       ADMIN server hostname (default: 'localhost')\n");
 	fprintf(stderr, "\t-l, --nsdbname       NSDB hostname\n");
 	fprintf(stderr, "\t-r, --nsdbport       NSDB port\n");
-	fprintf(stderr, "\t-s, --security       RPC security level\n");
 
 	fprintf(stderr, "%s", fedfs_gpl_boilerplate);
 
-	return EXIT_FAILURE;
+	exit((int)FEDFS_ERR_INVAL);
 }
 
 /**
  * Display NSDB information
  *
- * @param sectype NSDB connection security type to display
- * @param cert struct admin_cert to display
+ * @param result NSDB information to display
  * @param certfile NUL-terminated UTF-8 string containing pathname of file to write security data to
  */
 static void
-fedfs_get_nsdb_params_print_result(FedFsConnectionSec sectype,
-		struct admin_cert *cert, const char *certfile)
+fedfs_get_nsdb_params_print_result(FedFsGetNsdbParamsRes result,
+		const char *certfile)
 {
-	switch (sectype) {
+	FedFsNsdbParams *params = &result.FedFsGetNsdbParamsRes_u.params;
+
+	if (result.status == FEDFS_ERR_NSDB_PARAMS) {
+		printf("No connection parameters found\n");
+		return;
+	}
+
+	nsdb_print_fedfsstatus(result.status);
+	if (result.status != FEDFS_OK)
+		return;
+
+	switch (params->secType) {
 	case FEDFS_SEC_NONE:
 		printf("ConnectionSec: FEDFS_SEC_NONE\n");
 		break;
@@ -110,65 +123,13 @@ fedfs_get_nsdb_params_print_result(FedFsConnectionSec sectype,
 		printf("ConnectionSec: FEDFS_SEC_TLS\n");
 		if (certfile != NULL)
 			(void)nsdb_connsec_write_pem_file(certfile,
-							cert->ac_data,
-							cert->ac_len);
+				params->FedFsNsdbParams_u.secData.secData_val,
+				params->FedFsNsdbParams_u.secData.secData_len);
 		break;
 	default:
 		printf("Unrecognized FedFsConnectionSec value: %u\n",
-				sectype);
+				params->secType);
 	}
-}
-
-/**
- * Retrieve NSDB information from a remote fileserver
- *
- * @param host an initialized and opened admin_t
- * @param nsdb an NSDB hostname and port
- * @param certfile NUL-terminated UTF-8 string containing pathname of file to write security data to
- * @return program exit status
- */
-static int
-fedfs_get_nsdb_params_try(admin_t host, struct admin_nsdb *nsdb,
-		const char *certfile)
-{
-	FedFsConnectionSec sectype;
-	struct admin_cert *cert;
-	int status, err;
-
-	status = EXIT_FAILURE;
-	err = admin_get_nsdb_params(host, nsdb, &sectype, &cert);
-	switch (err) {
-	case 0:
-		break;
-	case EACCES:
-		xlog(L_ERROR, "%s: access denied", admin_hostname(host));
-		xlog(D_GENERAL, "%s",
-			admin_perror(host, admin_hostname(host)));
-		goto out;
-	case EIO:
-		xlog(L_ERROR, "%s",
-			admin_perror(host, admin_hostname(host)));
-		goto out;
-	default:
-		xlog(L_ERROR, "ADMIN client: %s", strerror(err));
-		goto out;
-	}
-
-	switch (admin_status(host)) {
-	case FEDFS_OK:
-		fedfs_get_nsdb_params_print_result(sectype, cert, certfile);
-		status = EXIT_SUCCESS;
-		break;
-	case FEDFS_ERR_NSDB_PARAMS:
-		printf("No connection parameters found\n");
-		break;
-	default:
-		nsdb_print_fedfsstatus(admin_status(host));
-	}
-	admin_free_cert(cert);
-
-out:
-	return status;
 }
 
 /**
@@ -176,40 +137,52 @@ out:
  *
  * @param hostname NUL-terminated UTF-8 string containing ADMIN server's hostname
  * @param nettype NUL-terminated C string containing nettype to use for connection
- * @param security NUL-terminated C string containing RPC security mode
- * @param nsdb an NSDB hostname and port
+ * @param nsdbname NUL-terminated UTF-8 string containing name of NSDB node to retrieve
+ * @param nsdbport port number of NSDB node to retrieve
  * @param certfile NUL-terminated UTF-8 string containing pathname of file to write security data to
- * @return program exit status
+ * @return a FedFsStatus code
  */
-static int
-fedfs_get_nsdb_params_host(const char *hostname, const char *nettype,
-		const char *security, struct admin_nsdb *nsdb,
+static FedFsStatus
+fedfs_get_nsdb_params_call(const char *hostname, const char *nettype,
+		char *nsdbname, const unsigned short nsdbport,
 		const char *certfile)
 {
-	admin_t host;
-	int status;
+	FedFsGetNsdbParamsRes result;
+	enum clnt_stat status;
+	FedFsNsdbName arg;
+	CLIENT *client;
 
-	status = EXIT_FAILURE;
-	switch (admin_create(hostname, nettype, security, &host)) {
-	case 0:
-		status = fedfs_get_nsdb_params_try(host, nsdb, certfile);
-		admin_release(host);
-		break;
-	case EINVAL:
-		xlog(L_ERROR, "Invalid command line parameter");
-		break;
-	case EACCES:
-		xlog(L_ERROR, "Failed to authenticate server");
-		break;
-	case EKEYEXPIRED:
-		xlog(L_ERROR, "User credentials not found");
-		break;
-	default:
-		xlog(L_ERROR, "%s",
-			admin_open_perror(hostname));
+	memset(&arg, 0, sizeof(arg));
+
+	arg.hostname.utf8string_len = strlen(nsdbname);
+	arg.hostname.utf8string_val = nsdbname;
+	arg.port = nsdbport;
+
+	client = clnt_create(hostname, FEDFS_PROG, FEDFS_V1, nettype);
+	if (client == NULL) {
+		clnt_pcreateerror("Failed to create FEDFS client");
+		result.status = FEDFS_ERR_SVRFAULT;
+		goto out;
 	}
 
-	return status;
+	memset((char *)&result, 0, sizeof(result));
+	status = clnt_call(client, FEDFS_GET_NSDB_PARAMS,
+				(xdrproc_t)xdr_FedFsNsdbName, (caddr_t)&arg,
+				(xdrproc_t)xdr_FedFsGetNsdbParamsRes, (caddr_t)&result,
+				fedfs_get_nsdb_params_timeout);
+	if (status != RPC_SUCCESS) {
+		clnt_perror(client, "FEDFS_GET_NSDB_PARAMS call failed");
+		result.status = FEDFS_ERR_SVRFAULT;
+	} else {
+		fedfs_get_nsdb_params_print_result(result, certfile);
+		clnt_freeres(client,
+			(xdrproc_t)xdr_FedFsGetNsdbParamsRes,
+			(caddr_t)&result);
+	}
+	(void)clnt_destroy(client);
+
+out:
+	return result.status;
 }
 
 /**
@@ -222,9 +195,11 @@ fedfs_get_nsdb_params_host(const char *hostname, const char *nettype,
 int
 main(int argc, char **argv)
 {
-	char *progname, *hostname, *nettype, *security, *certfile;
-	struct admin_nsdb nsdb;
-	int arg, status;
+	char *progname, *hostname, *nettype, *nsdbname, *certfile;
+	unsigned short nsdbport;
+	unsigned int seconds;
+	FedFsStatus status;
+	int arg;
 
 	(void)setlocale(LC_ALL, "");
 	(void)umask(S_IRWXO);
@@ -240,11 +215,10 @@ main(int argc, char **argv)
 	xlog_syslog(0);
 	xlog_open(progname);
 
-	nsdb_env((char **)&nsdb.an_hostname, &nsdb.an_port, NULL, NULL);
+	nsdb_env(&nsdbname, &nsdbport, NULL, NULL);
 
 	hostname = "localhost";
 	nettype = "netpath";
-	security = "unix";
 	certfile = NULL;
 	while ((arg = getopt_long(argc, argv, fedfs_get_nsdb_params_opts, fedfs_get_nsdb_params_longopts, NULL)) != -1) {
 		switch (arg) {
@@ -261,43 +235,48 @@ main(int argc, char **argv)
 			if (!nsdb_is_hostname_utf8(optarg)) {
 				fprintf(stderr, "NSDB name %s is "
 					"not a UTF-8 hostname\n", optarg);
-				return fedfs_get_nsdb_params_usage(progname);
+				fedfs_get_nsdb_params_usage(progname);
 			}
-			nsdb.an_hostname = optarg;
+			nsdbname = optarg;
 			break;
 		case 'n':
 			nettype = optarg;
 			break;
 		case 'r':
-			if (!nsdb_parse_port_string(optarg, &nsdb.an_port)) {
+			if (!nsdb_parse_port_string(optarg, &nsdbport)) {
 				fprintf(stderr, "Bad port number: %s\n",
 					optarg);
-				return fedfs_get_nsdb_params_usage(progname);
+				fedfs_get_nsdb_params_usage(progname);
 			}
-			break;
-		case 's':
-			security = optarg;
 			break;
 		default:
 			fprintf(stderr, "Invalid command line argument: %c\n", (char)arg);
 		case '?':
-			return fedfs_get_nsdb_params_usage(progname);
+			fedfs_get_nsdb_params_usage(progname);
 		}
 	}
 	if (optind != argc) {
 		fprintf(stderr, "Unrecognized command line argument\n");
-		return fedfs_get_nsdb_params_usage(progname);
+		fedfs_get_nsdb_params_usage(progname);
 	}
-	if (nsdb.an_hostname == NULL) {
+	if (nsdbname == NULL) {
 		fprintf(stderr, "Missing required command line argument\n");
-		return fedfs_get_nsdb_params_usage(progname);
+		fedfs_get_nsdb_params_usage(progname);
 	}
 
 	nsdb_connsec_crypto_startup();
 
-	status = fedfs_get_nsdb_params_host(hostname, nettype,
-						security, &nsdb, certfile);
+	for (seconds = FEDFS_DELAY_MIN_SECS;; seconds = fedfs_delay(seconds)) {
+		status = fedfs_get_nsdb_params_call(hostname, nettype,
+						nsdbname, nsdbport, certfile);
+		if (status != FEDFS_ERR_DELAY)
+			break;
+
+		xlog(D_GENERAL, "Delaying %u seconds...", seconds);
+		if (sleep(seconds) != 0)
+			break;
+	}
 
 	nsdb_connsec_crypto_shutdown();
-	return status;
+	return (int)status;
 }

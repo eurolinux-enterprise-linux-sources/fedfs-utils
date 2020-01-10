@@ -345,6 +345,7 @@ nfsref_lookup_resolve_fsn(const char *fsn_uuid, nsdb_t host)
 	int status = EXIT_FAILURE;
 	struct fedfs_fsl *fsls;
 	struct fedfs_fsn *fsn;
+	unsigned int ldap_err;
 	FedFsStatus retval;
 	int fsn_ttl;
 
@@ -352,7 +353,7 @@ nfsref_lookup_resolve_fsn(const char *fsn_uuid, nsdb_t host)
 		__func__, fsn_uuid, nsdb_hostname(host), nsdb_port(host));
 
 again:
-	retval = nsdb_open_nsdb(host, NULL, NULL);
+	retval = nsdb_open_nsdb(host, NULL, NULL, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		break;
@@ -367,7 +368,7 @@ again:
 	case FEDFS_ERR_NSDB_LDAP_VAL:
 		xlog(L_ERROR, "Failed to bind to NSDB %s:%u: %s",
 			nsdb_hostname(host), nsdb_port(host),
-			nsdb_ldaperr2string(host));
+			ldap_err2string(ldap_err));
 		return status;
 	default:
 		xlog(L_ERROR, "Failed to open NSDB %s:%u: %s",
@@ -377,7 +378,7 @@ again:
 	}
 
 
-	retval = nsdb_get_fsn_s(host, NULL, fsn_uuid, &fsn);
+	retval = nsdb_get_fsn_s(host, NULL, fsn_uuid, &fsn, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		fsn_ttl = fsn->fn_fsnttl;
@@ -389,7 +390,7 @@ again:
 		goto out_close;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
 		xlog(L_ERROR, "%s: NSDB operation failed with %s",
-			__func__, nsdb_ldaperr2string(host));
+			__func__, ldap_err2string(ldap_err));
 		goto out_close;
 	default:
 		xlog(L_ERROR, "%s: Failed to retrieve FSN %s: %s",
@@ -397,7 +398,7 @@ again:
 		goto out_close;
 	}
 
-	retval = nsdb_resolve_fsn_s(host, NULL, fsn_uuid, &fsls);
+	retval = nsdb_resolve_fsn_s(host, NULL, fsn_uuid, &fsls, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		printf("fedfsFsnUuid:\t%s\n", fsn_uuid);
@@ -418,7 +419,7 @@ again:
 			__func__, fsn_uuid);
 		break;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
-		switch (nsdb_ldaperr(host)) {
+		switch (ldap_err) {
 		case LDAP_REFERRAL:
 			retval = nfsref_lookup_follow_ldap_referral(&host);
 			if (retval == FEDFS_OK)
@@ -430,7 +431,7 @@ again:
 			break;
 		default:
 			xlog(L_ERROR, "%s: NSDB operation failed with %s",
-				__func__, nsdb_ldaperr2string(host));
+				__func__, ldap_err2string(ldap_err));
 		}
 		break;
 	default:

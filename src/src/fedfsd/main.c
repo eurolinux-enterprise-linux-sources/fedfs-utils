@@ -164,7 +164,9 @@ int main(int argc, char **argv)
 			gid = grp->gr_gid;
 			break;
 		case '?':
-			fprintf(stderr, "Version " VERSION "\n\n");
+			fprintf(stderr, "Version " VERSION
+					", built on %s at %s\n\n",
+					__DATE__, __TIME__);
 			fedfsd_usage(progname);
 			break;
 		case 'o':
@@ -208,13 +210,7 @@ int main(int argc, char **argv)
 	if (!fedfsd_drop_privileges(uid, gid))
 		exit(EXIT_FAILURE);
 
-	if (!nsdb_init_database()) {
-		xlog(L_ERROR, "Failed to initialize "
-			"NSDB connection parameters database");
-		exit(EXIT_FAILURE);
-	}
-
-	if (!fedfsd_read_access_config(FEDFSD_ACCESS_CONFIG))
+	if (!nsdb_init_database())
 		exit(EXIT_FAILURE);
 
 	if (!foreground) {
@@ -228,10 +224,8 @@ int main(int argc, char **argv)
 		}
 	}
 
-	xlog(L_NOTICE, "Version " VERSION " starting");
-
-	if (!fedfsd_set_up_authenticators())
-		exit(EXIT_FAILURE);
+	xlog(L_NOTICE, "Version " VERSION " (built %s at %s) starting",
+			__DATE__, __TIME__);
 
 	nsdb_connsec_crypto_startup();
 

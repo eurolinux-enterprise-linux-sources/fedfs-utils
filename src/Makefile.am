@@ -24,7 +24,7 @@
 ##
 
 AUTOMAKE_OPTIONS	= foreign
-SUBDIRS			= doc src contrib sysconf
+SUBDIRS			= doc src contrib
 dist_noinst_SCRIPTS	= autogen.sh
 EXTRA_DIST		= ChangeLog COPYING README INSTALL doxy.cfg .gitignore
 ACLOCAL_AMFLAGS		= -I m4
@@ -35,20 +35,9 @@ DISTCLEANFILES		= Makefile.in ChangeLog fedfs-utils*.tar.gz
 ChangeLog:
 	git log > ChangeLog
 
-clean-local: doxyclean covclean
+clean-local: doxyclean
 
 dist-hook: ChangeLog
-
-# Coverity-related targets
-
-.PHONY: covbuild covclean
-
-covbuild:
-	cov-build --dir cov-int make
-	tar czvf /tmp/fedfs-utils-cov-int.tgz cov-int
-
-covclean:
-	$(RM) -rf cov-int
 
 # Doxygen-related targets
 

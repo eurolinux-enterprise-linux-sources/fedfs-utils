@@ -8,9 +8,8 @@ Doxygen/
 *.o
 *.lo
 *.la
-src/domainroot/fedfs-domainroot
 src/fedfsd/fedfsd
-src/jumpstart/nsdb-jumpstart
+src/resolve-junction/resolve-junction
 src/nsdbparams/nsdbparams
 src/nfsref/nfsref
 src/mount/mount.fedfs
@@ -47,8 +46,6 @@ nsdb-update-fsl
 nsdb-update-nci
 nsdb-remove-nci
 nsdb-delete-nsdb
-doc/man/*.7
-doc/man/*.8
 doc/rpcl/fedfs_admin.h
 doc/rpcl/fedfs_admin_clnt.c
 doc/rpcl/fedfs_admin_svc.c
@@ -62,7 +59,6 @@ configure
 aclocal.m4
 config.guess
 config.h.in
-config.h.in~
 config.h
 config.sub
 install-sh
@@ -76,6 +72,3 @@ depcomp
 .deps/
 .libs/
 .stgit*
-py-compile
-cov-int/
-compile

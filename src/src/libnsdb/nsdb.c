@@ -95,7 +95,7 @@ static char fedfs_nsdbcerts_dirname[PATH_MAX + 1] =
 /**
  * Stores pathname of database containing FedFS persistent state
  */
-static char fedfs_db_filename[PATH_MAX + 1] =
+static char fedfs_db_filename[PATH_MAX] =
 			FEDFS_DEFAULT_STATEDIR "/" FEDFS_DATABASE_FILE;
 
 /**
@@ -110,57 +110,49 @@ static char fedfs_db_filename[PATH_MAX + 1] =
 _Bool
 nsdb_set_parentdir(const char *parentdir)
 {
-	static char buf[PATH_MAX + 1];
+	static char buf[PATH_MAX];
 	struct stat st;
 	char *path;
 	int len;
 
-	if (parentdir == NULL) {
-		xlog(D_GENERAL, "%s: Passed a NULL argument", __func__);
-		return false;
-	}
-	if (strlen(parentdir) > PATH_MAX) {
-		xlog(D_GENERAL, "%s: Argument too long", __func__);
-		return false;
-	}
-
 	xlog(D_CALL, "%s: Setting up %s as our FedFS state directory",
 		__func__, parentdir);
 
+	/* First: test length of name and whether it exists */
 	if (lstat(parentdir, &st) == -1) {
-		xlog(D_GENERAL, "%s: Failed to stat %s: %m",
-			__func__, parentdir);
+		xlog(L_ERROR, "Failed to stat %s: %m", parentdir);
 		return false;
 	}
 	if (!S_ISDIR(st.st_mode)) {
-		xlog(D_GENERAL, "%s: %s is not a directory",
-			__func__, parentdir);
+		xlog(L_ERROR, "%s is not a directory", parentdir);
 		return false;
 	}
-	strcpy(buf, parentdir);
+
+	/* Ensure we have a clean directory pathname */
+	strncpy(buf, parentdir, sizeof(buf));
 	path = dirname(buf);
 	if (*path == '.') {
-		xlog(D_GENERAL, "%s: Pathname %s is relative",
-			__func__, parentdir);
+		xlog(L_ERROR, "Unusable pathname %s",
+				parentdir);
 		return false;
 	}
 
 	len = snprintf(buf, sizeof(buf), "%s/%s", parentdir, FEDFS_DATABASE_FILE);
 	if (len > PATH_MAX) {
-		xlog(D_GENERAL, "%s: FedFS database pathname is too long",
-			__func__);
+		xlog(L_ERROR, "FedFS database pathname is too long");
 		return false;
 	}
 	strcpy(fedfs_db_filename, buf);
 
 	len = snprintf(buf, sizeof(buf), "%s/%s", parentdir, FEDFS_NSDBCERT_DIR);
 	if (len > PATH_MAX) {
-		xlog(D_GENERAL, "%s: FedFS cert directory pathname is too long",
-			__func__);
+		xlog(L_ERROR, "FedFS cert directory pathname is too long");
 		return false;
 	}
 	strcpy(fedfs_nsdbcerts_dirname, buf);
-	strcpy(fedfs_base_dirname, parentdir);
+
+	strncpy(fedfs_base_dirname, parentdir, sizeof(fedfs_base_dirname));
+
 	return true;
 }
 
@@ -199,16 +191,17 @@ nsdb_create_private_certfile(char **pathbuf)
 	retval = FEDFS_ERR_SVRFAULT;
 	if (mkdir(fedfs_nsdbcerts_dirname, FEDFS_BASE_DIRMODE) == -1) {
 		if (errno != EEXIST) {
-			xlog(D_GENERAL,
-				"%s: Failed to create certfile directory: %m",
-				__func__);
+			xlog(L_ERROR, "Failed to create certfile directory: %m");
 			goto out;
 		}
 	}
 
 	tmp = malloc(PATH_MAX);
-	if (tmp == NULL)
+	if (tmp == NULL) {
+		xlog(D_GENERAL, "%s: failed to allocate pathname buffer",
+			__func__);
 		goto out;
+	}
 
 	len = snprintf(tmp, PATH_MAX, "%s/nsdbXXXXXX.pem",
 				fedfs_nsdbcerts_dirname);
@@ -284,8 +277,7 @@ nsdb_init_database(void)
 
 	if (mkdir(fedfs_base_dirname, FEDFS_BASE_DIRMODE) == -1) {
 		if (errno != EEXIST) {
-			xlog(D_GENERAL, "%s: Failed to create base dir: %m",
-				__func__);
+			xlog(L_ERROR, "Failed to create base dir: %m");
 			goto out;
 		}
 		xlog(D_GENERAL, "%s: Base dir %s exists",
@@ -305,9 +297,8 @@ nsdb_init_database(void)
 	rc = sqlite3_exec(db, "PRAGMA journal_mode=TRUNCATE;",
 					NULL, NULL, &err_msg);
 	if (rc != SQLITE_OK) {
-		xlog(D_GENERAL,
-			"%s: Failed to enable persistent journaling: %s",
-			__func__, err_msg);
+		xlog(L_ERROR, "Failed to enable persistent journaling: %s",
+				err_msg);
 		sqlite3_free(err_msg);
 		goto out_close;
 	}
@@ -343,7 +334,7 @@ const char *nsdb_hostname(const nsdb_t host)
  * Return length of nsdb_t's hostname, in bytes
  *
  * @param host pointer to initialized nsdb_t
- * @return the number of bytes in "host's" hostname, excluding the terminating NUL
+ * @return NUL-terminated C string containing NSDB's hostname
  */
 size_t nsdb_hostname_len(const nsdb_t host)
 {
@@ -365,7 +356,7 @@ unsigned short nsdb_port(const nsdb_t host)
  * Return nsdb_t's NSDB connection security type
  *
  * @param host pointer to initialized nsdb_t struct
- * @return NSDB's connection security type
+ * @return NSDB's port number
  */
 FedFsConnectionSec nsdb_sectype(const nsdb_t host)
 {
@@ -495,30 +486,6 @@ nsdb_referred_to(const nsdb_t host)
 }
 
 /**
- * Return ldap error code from most recent LDAP operation
- *
- * @param host an instantiated nsdb_t object
- * @return an LDAP error code
- */
-int
-nsdb_ldaperr(const nsdb_t host)
-{
-	return host->fn_ldaperr;
-}
-
-/**
- * Return ldap error message from most recent LDAP operation
- *
- * @param host an instantiated nsdb_t object
- * @return NUL-terminated C string containing LDAP error message
- */
-const char *
-nsdb_ldaperr2string(const nsdb_t host)
-{
-	return ldap_err2string(host->fn_ldaperr);
-}
-
-/**
  * Retrieve NSDB-related environment variables
  *
  * @param nsdbname OUT: pointer to statically allocated NUL-terminated C string containing NSDB hostname
@@ -573,12 +540,17 @@ nsdb_new_nsdb(const char *hostname, const unsigned long port, nsdb_t *host)
 		port_tmp = port;
 
 	hostname_tmp = strdup(hostname);
-	if (hostname_tmp == NULL)
+	if (hostname_tmp == NULL) {
+		xlog(D_GENERAL, "%s: Failed to allocate memory for nsdb object",
+				__func__);
 		return FEDFS_ERR_SVRFAULT;
+	}
 
 	*host = malloc(sizeof(**host));
 	if (*host == NULL) {
 		free(hostname_tmp);
+		xlog(D_GENERAL, "%s: Failed to allocate memory for nsdb object",
+				__func__);
 		return FEDFS_ERR_SVRFAULT;
 	}
 
@@ -714,15 +686,15 @@ nsdb_new_nsdbname(sqlite3 *db, const nsdb_t host)
 
 	rc = sqlite3_bind_text(stmt, 1, domainname, -1, SQLITE_STATIC);
 	if (rc != SQLITE_OK) {
-		xlog(D_GENERAL, "%s: Failed to bind NSDB hostname %s: %s",
-			__func__, domainname, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to bind NSDB hostname %s: %s",
+			domainname, sqlite3_errmsg(db));
 		goto out_finalize;
 	}
 
 	rc = sqlite3_bind_int(stmt, 2, port);
 	if (rc != SQLITE_OK) {
-		xlog(D_GENERAL, "%s: Failed to bind port number: %s",
-			__func__, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to bind port number: %s",
+			sqlite3_errmsg(db));
 		goto out_finalize;
 	}
 
@@ -739,9 +711,8 @@ nsdb_new_nsdbname(sqlite3 *db, const nsdb_t host)
 		retval = FEDFS_OK;
 		break;
 	default:
-		xlog(D_GENERAL,
-			"%s: Failed to create NSDB info record for '%s:%u': %s",
-			__func__, domainname, port, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to create NSDB info record for '%s:%u': %s",
+			domainname, port, sqlite3_errmsg(db));
 	}
 
 out_finalize:
@@ -779,29 +750,29 @@ nsdb_update_security_nsdbname(sqlite3 *db, const nsdb_t host,
 
 	rc = sqlite3_bind_int(stmt, 1, sectype);
 	if (rc != SQLITE_OK) {
-		xlog(D_GENERAL, "%s: Failed to bind connection security value: %s",
-			__func__, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to bind connection security value: %s",
+			sqlite3_errmsg(db));
 		goto out_finalize;
 	}
 
 	rc = sqlite3_bind_text(stmt, 2, certfile, -1, SQLITE_STATIC);
 	if (rc != SQLITE_OK) {
-		xlog(D_GENERAL, "%s: Failed to bind security data value: %s",
-			__func__, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to bind security data value: %s",
+			sqlite3_errmsg(db));
 		goto out_finalize;
 	}
 
 	rc = sqlite3_bind_text(stmt, 3, domainname, -1, SQLITE_STATIC);
 	if (rc != SQLITE_OK) {
-		xlog(D_GENERAL, "%s: Failed to bind NSDB hostname %s: %s",
-			__func__, domainname, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to bind NSDB hostname %s: %s",
+			domainname, sqlite3_errmsg(db));
 		goto out_finalize;
 	}
 
 	rc = sqlite3_bind_int(stmt, 4, port);
 	if (rc != SQLITE_OK) {
-		xlog(D_GENERAL, "%s: Failed to bind port number: %s",
-			__func__, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to bind port number: %s",
+			sqlite3_errmsg(db));
 		goto out_finalize;
 	}
 
@@ -813,9 +784,8 @@ nsdb_update_security_nsdbname(sqlite3 *db, const nsdb_t host,
 		retval = FEDFS_OK;
 		break;
 	default:
-		xlog(D_GENERAL,
-			"%s: Failed to update NSDB info record for '%s:%u': %s",
-			__func__, domainname, port, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to update NSDB info record for '%s:%u': %s",
+			domainname, port, sqlite3_errmsg(db));
 	}
 
 out_finalize:
@@ -849,22 +819,22 @@ nsdb_update_nsdb_default_binddn(sqlite3 *db, const nsdb_t host,
 
 	rc = sqlite3_bind_text(stmt, 1, binddn, -1, SQLITE_STATIC);
 	if (rc != SQLITE_OK) {
-		xlog(D_GENERAL, "%s: Failed to bind default bind DN%s: %s",
-			__func__, binddn, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to bind default bind DN%s: %s",
+			binddn, sqlite3_errmsg(db));
 		goto out_finalize;
 	}
 
 	rc = sqlite3_bind_text(stmt, 2, domainname, -1, SQLITE_STATIC);
 	if (rc != SQLITE_OK) {
-		xlog(D_GENERAL, "%s: Failed to bind NSDB hostname %s: %s",
-			__func__, domainname, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to bind NSDB hostname %s: %s",
+			domainname, sqlite3_errmsg(db));
 		goto out_finalize;
 	}
 
 	rc = sqlite3_bind_int(stmt, 3, port);
 	if (rc != SQLITE_OK) {
-		xlog(D_GENERAL, "%s: Failed to bind port number: %s",
-			__func__, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to bind port number: %s",
+			sqlite3_errmsg(db));
 		goto out_finalize;
 	}
 
@@ -876,9 +846,8 @@ nsdb_update_nsdb_default_binddn(sqlite3 *db, const nsdb_t host,
 		retval = FEDFS_OK;
 		break;
 	default:
-		xlog(D_GENERAL,
-			"%s: Failed to update default bind DN for '%s:%u': %s",
-			__func__, domainname, port, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to update default bind DN for '%s:%u': %s",
+			domainname, port, sqlite3_errmsg(db));
 	}
 
 out_finalize:
@@ -912,22 +881,22 @@ nsdb_update_nsdb_default_nce(sqlite3 *db, const nsdb_t host,
 
 	rc = sqlite3_bind_text(stmt, 1, nce, -1, SQLITE_STATIC);
 	if (rc != SQLITE_OK) {
-		xlog(D_GENERAL, "%s: Failed to bind default NCE DN%s: %s",
-			__func__, nce, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to bind default NCE DN%s: %s",
+			nce, sqlite3_errmsg(db));
 		goto out_finalize;
 	}
 
 	rc = sqlite3_bind_text(stmt, 2, domainname, -1, SQLITE_STATIC);
 	if (rc != SQLITE_OK) {
-		xlog(D_GENERAL, "%s: Failed to bind NSDB hostname %s: %s",
-			__func__, domainname, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to bind NSDB hostname %s: %s",
+			domainname, sqlite3_errmsg(db));
 		goto out_finalize;
 	}
 
 	rc = sqlite3_bind_int(stmt, 3, port);
 	if (rc != SQLITE_OK) {
-		xlog(D_GENERAL, "%s: Failed to bind port number: %s",
-			__func__, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to bind port number: %s",
+			sqlite3_errmsg(db));
 		goto out_finalize;
 	}
 
@@ -939,9 +908,8 @@ nsdb_update_nsdb_default_nce(sqlite3 *db, const nsdb_t host,
 		retval = FEDFS_OK;
 		break;
 	default:
-		xlog(D_GENERAL,
-			"%s: Failed to update default NCE DN for '%s:%u': %s",
-			__func__, domainname, port, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to update default NCE DN for '%s:%u': %s",
+			domainname, port, sqlite3_errmsg(db));
 	}
 
 out_finalize:
@@ -975,22 +943,22 @@ nsdb_update_nsdb_follow_referrals(sqlite3 *db, const nsdb_t host,
 
 	rc = sqlite3_bind_int(stmt, 1, follow_referrals ? 1 : 0);
 	if (rc != SQLITE_OK) {
-		xlog(D_GENERAL, "%s: Failed to bind follow referrals flag: %s",
-			__func__, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to bind follow referrals flag: %s",
+			sqlite3_errmsg(db));
 		goto out_finalize;
 	}
 
 	rc = sqlite3_bind_text(stmt, 2, domainname, -1, SQLITE_STATIC);
 	if (rc != SQLITE_OK) {
-		xlog(D_GENERAL, "%s: Failed to bind NSDB hostname %s: %s",
-			__func__, domainname, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to bind NSDB hostname %s: %s",
+			domainname, sqlite3_errmsg(db));
 		goto out_finalize;
 	}
 
 	rc = sqlite3_bind_int(stmt, 3, port);
 	if (rc != SQLITE_OK) {
-		xlog(D_GENERAL, "%s: Failed to bind port number: %s",
-			D_GENERAL, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to bind port number: %s",
+			sqlite3_errmsg(db));
 		goto out_finalize;
 	}
 
@@ -1002,9 +970,8 @@ nsdb_update_nsdb_follow_referrals(sqlite3 *db, const nsdb_t host,
 		retval = FEDFS_OK;
 		break;
 	default:
-		xlog(D_GENERAL,
-			"%s: Failed to update referrals flag for '%s:%u': %s",
-			__func__, domainname, port, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to update referrals flag for '%s:%u': %s",
+			domainname, port, sqlite3_errmsg(db));
 	}
 
 out_finalize:
@@ -1041,15 +1008,15 @@ nsdb_delete_nsdbname(sqlite3 *db, const nsdb_t host)
 
 	rc = sqlite3_bind_text(stmt, 1, hostname, -1, SQLITE_STATIC);
 	if (rc != SQLITE_OK) {
-		xlog(D_GENERAL, "%s: Failed to bind NSDB hostname %s: %s",
-			__func__, hostname, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to bind NSDB hostname %s: %s",
+				hostname, sqlite3_errmsg(db));
 		goto out_finalize;
 	}
 
 	rc = sqlite3_bind_int(stmt, 2, port);
 	if (rc != SQLITE_OK) {
-		xlog(D_GENERAL, "%s: Failed to bind port number: %s",
-			__func__, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to bind port number: %s",
+				sqlite3_errmsg(db));
 		goto out_finalize;
 	}
 
@@ -1061,9 +1028,8 @@ nsdb_delete_nsdbname(sqlite3 *db, const nsdb_t host)
 		retval = FEDFS_OK;
 		break;
 	default:
-		xlog(D_GENERAL,
-			"%s: Failed to delete NSDB info record for '%s:%u': %s",
-			__func__, hostname, port, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to delete NSDB info record for '%s:%u': %s",
+			hostname, port, sqlite3_errmsg(db));
 	}
 
 out_finalize:
@@ -1427,7 +1393,7 @@ nsdb_enumerate_nsdbs(char ***nsdblist)
 	rc = sqlite3_get_table(db, "SELECT nsdbName,nsdbPort from nsdbs;",
 					&resultp, &nrows, &ncols, &err_msg);
 	if (rc != SQLITE_OK) {
-		xlog(D_GENERAL, "%s: Failed to read table nsdbs: %s",
+		xlog(L_ERROR, "%s: Failed to read table nsdbs: %s",
 			__func__, err_msg);
 		sqlite3_free(err_msg);
 		goto out_close;
@@ -1444,15 +1410,18 @@ nsdb_enumerate_nsdbs(char ***nsdblist)
 	}
 
 	if (nrows < 1 || ncols != 2) {
-		xlog(D_GENERAL, "%s: Returned table had "
+		xlog(L_ERROR, "%s: Returned table had "
 			"incorrect table dimensions: (%d, %d)",
 			__func__, nrows, ncols);
 		goto out_free;
 	}
 
 	result = calloc(nrows + 1, sizeof(char *));
-	if (result == NULL)
+	if (result == NULL) {
+		xlog(L_ERROR, "%s: Failed to allocate memory for result",
+			__func__);
 		goto out_free;
+	}
 
 	for (i = 0; i < nrows; i++) {
 		char *hostname = resultp[(i + 1) * 2];
@@ -1461,6 +1430,8 @@ nsdb_enumerate_nsdbs(char ***nsdblist)
 
 		tmp = malloc(strlen(hostname) + strlen(":") + strlen(port) + 1);
 		if (tmp == NULL) {
+			xlog(L_ERROR, "%s: Failed to allocate memory "
+				"for result", __func__);
 			nsdb_free_string_array(result);
 			goto out_free;
 		}
@@ -1510,6 +1481,7 @@ nsdb_delete_nsdb(const char *hostname, const unsigned short port)
  * @param host an initialized nsdb_t object
  * @param binddn NUL-terminated UTF-8 C string containing DN to which to bind
  * @param passwd NUL-terminated UTF-8 C string containing bind password
+ * @param ldap_err OUT: possibly an LDAP error code
  * @return a FedFsStatus code
  *
  * This function may ask for a password on stdin if "binddn" is
@@ -1518,13 +1490,13 @@ nsdb_delete_nsdb(const char *hostname, const unsigned short port)
  * When false is returned, the nsdb_t object remains closed.
  */
 FedFsStatus
-nsdb_open_nsdb(nsdb_t host, const char *binddn, const char *passwd)
+nsdb_open_nsdb(nsdb_t host, const char *binddn, const char *passwd,
+		unsigned int *ldap_err)
 {
 	FedFsStatus retval;
 	LDAP *ld;
 
-	retval = nsdb_open(host->fn_hostname, host->fn_port, &ld,
-				&host->fn_ldaperr);
+	retval = nsdb_open(host->fn_hostname, host->fn_port, &ld, ldap_err);
 	if (retval != FEDFS_OK)
 		return retval;
 
@@ -1532,8 +1504,7 @@ nsdb_open_nsdb(nsdb_t host, const char *binddn, const char *passwd)
 	case FEDFS_SEC_NONE:
 		break;
 	case FEDFS_SEC_TLS:
-		retval = nsdb_start_tls(ld, nsdb_certfile(host),
-						&host->fn_ldaperr);
+		retval = nsdb_start_tls(ld, nsdb_certfile(host), ldap_err);
 		if (retval != FEDFS_OK)
 			goto out_unbind;
 		break;
@@ -1544,7 +1515,7 @@ nsdb_open_nsdb(nsdb_t host, const char *binddn, const char *passwd)
 		goto out_unbind;
 	}
 
-	retval = nsdb_bind(ld, binddn, passwd, &host->fn_ldaperr);
+	retval = nsdb_bind(ld, binddn, passwd, ldap_err);
 	if (retval != FEDFS_OK)
 		goto out_unbind;
 

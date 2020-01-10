@@ -8,6 +8,8 @@
 bool_t
 xdr_FedFsStatus (XDR *xdrs, FedFsStatus *objp)
 {
+	register int32_t *buf;
+
 	 if (!xdr_enum (xdrs, (enum_t *) objp))
 		 return FALSE;
 	return TRUE;
@@ -16,6 +18,8 @@ xdr_FedFsStatus (XDR *xdrs, FedFsStatus *objp)
 bool_t
 xdr_utf8string (XDR *xdrs, utf8string *objp)
 {
+	register int32_t *buf;
+
 	 if (!xdr_bytes (xdrs, (char **)&objp->utf8string_val, (u_int *) &objp->utf8string_len, ~0))
 		 return FALSE;
 	return TRUE;
@@ -24,6 +28,8 @@ xdr_utf8string (XDR *xdrs, utf8string *objp)
 bool_t
 xdr_ascii_REQUIRED4 (XDR *xdrs, ascii_REQUIRED4 *objp)
 {
+	register int32_t *buf;
+
 	 if (!xdr_utf8string (xdrs, objp))
 		 return FALSE;
 	return TRUE;
@@ -32,6 +38,8 @@ xdr_ascii_REQUIRED4 (XDR *xdrs, ascii_REQUIRED4 *objp)
 bool_t
 xdr_utf8val_REQUIRED4 (XDR *xdrs, utf8val_REQUIRED4 *objp)
 {
+	register int32_t *buf;
+
 	 if (!xdr_utf8string (xdrs, objp))
 		 return FALSE;
 	return TRUE;
@@ -40,6 +48,8 @@ xdr_utf8val_REQUIRED4 (XDR *xdrs, utf8val_REQUIRED4 *objp)
 bool_t
 xdr_FedFsUuid (XDR *xdrs, FedFsUuid objp)
 {
+	register int32_t *buf;
+
 	 if (!xdr_opaque (xdrs, objp, 16))
 		 return FALSE;
 	return TRUE;
@@ -48,6 +58,8 @@ xdr_FedFsUuid (XDR *xdrs, FedFsUuid objp)
 bool_t
 xdr_FedFsNsdbName (XDR *xdrs, FedFsNsdbName *objp)
 {
+	register int32_t *buf;
+
 	 if (!xdr_u_int (xdrs, &objp->port))
 		 return FALSE;
 	 if (!xdr_utf8val_REQUIRED4 (xdrs, &objp->hostname))
@@ -58,6 +70,8 @@ xdr_FedFsNsdbName (XDR *xdrs, FedFsNsdbName *objp)
 bool_t
 xdr_FedFsPathComponent (XDR *xdrs, FedFsPathComponent *objp)
 {
+	register int32_t *buf;
+
 	 if (!xdr_ascii_REQUIRED4 (xdrs, objp))
 		 return FALSE;
 	return TRUE;
@@ -66,6 +80,8 @@ xdr_FedFsPathComponent (XDR *xdrs, FedFsPathComponent *objp)
 bool_t
 xdr_FedFsPathName (XDR *xdrs, FedFsPathName *objp)
 {
+	register int32_t *buf;
+
 	 if (!xdr_array (xdrs, (char **)&objp->FedFsPathName_val, (u_int *) &objp->FedFsPathName_len, ~0,
 		sizeof (FedFsPathComponent), (xdrproc_t) xdr_FedFsPathComponent))
 		 return FALSE;
@@ -75,6 +91,8 @@ xdr_FedFsPathName (XDR *xdrs, FedFsPathName *objp)
 bool_t
 xdr_FedFsFsn (XDR *xdrs, FedFsFsn *objp)
 {
+	register int32_t *buf;
+
 	 if (!xdr_FedFsUuid (xdrs, objp->fsnUuid))
 		 return FALSE;
 	 if (!xdr_FedFsNsdbName (xdrs, &objp->nsdbName))
@@ -85,6 +103,8 @@ xdr_FedFsFsn (XDR *xdrs, FedFsFsn *objp)
 bool_t
 xdr_FedFsFslType (XDR *xdrs, FedFsFslType *objp)
 {
+	register int32_t *buf;
+
 	 if (!xdr_enum (xdrs, (enum_t *) objp))
 		 return FALSE;
 	return TRUE;
@@ -93,6 +113,8 @@ xdr_FedFsFslType (XDR *xdrs, FedFsFslType *objp)
 bool_t
 xdr_FedFsNfsFsl (XDR *xdrs, FedFsNfsFsl *objp)
 {
+	register int32_t *buf;
+
 	 if (!xdr_FedFsUuid (xdrs, objp->fslUuid))
 		 return FALSE;
 	 if (!xdr_u_int (xdrs, &objp->port))
@@ -107,6 +129,8 @@ xdr_FedFsNfsFsl (XDR *xdrs, FedFsNfsFsl *objp)
 bool_t
 xdr_FedFsFsl (XDR *xdrs, FedFsFsl *objp)
 {
+	register int32_t *buf;
+
 	 if (!xdr_FedFsFslType (xdrs, &objp->type))
 		 return FALSE;
 	switch (objp->type) {
@@ -123,6 +147,8 @@ xdr_FedFsFsl (XDR *xdrs, FedFsFsl *objp)
 bool_t
 xdr_FedFsPathType (XDR *xdrs, FedFsPathType *objp)
 {
+	register int32_t *buf;
+
 	 if (!xdr_enum (xdrs, (enum_t *) objp))
 		 return FALSE;
 	return TRUE;
@@ -131,6 +157,8 @@ xdr_FedFsPathType (XDR *xdrs, FedFsPathType *objp)
 bool_t
 xdr_FedFsPath (XDR *xdrs, FedFsPath *objp)
 {
+	register int32_t *buf;
+
 	 if (!xdr_FedFsPathType (xdrs, &objp->type))
 		 return FALSE;
 	switch (objp->type) {
@@ -151,6 +179,8 @@ xdr_FedFsPath (XDR *xdrs, FedFsPath *objp)
 bool_t
 xdr_FedFsCreateArgs (XDR *xdrs, FedFsCreateArgs *objp)
 {
+	register int32_t *buf;
+
 	 if (!xdr_FedFsPath (xdrs, &objp->path))
 		 return FALSE;
 	 if (!xdr_FedFsFsn (xdrs, &objp->fsn))
@@ -161,6 +191,8 @@ xdr_FedFsCreateArgs (XDR *xdrs, FedFsCreateArgs *objp)
 bool_t
 xdr_FedFsResolveType (XDR *xdrs, FedFsResolveType *objp)
 {
+	register int32_t *buf;
+
 	 if (!xdr_enum (xdrs, (enum_t *) objp))
 		 return FALSE;
 	return TRUE;
@@ -169,6 +201,8 @@ xdr_FedFsResolveType (XDR *xdrs, FedFsResolveType *objp)
 bool_t
 xdr_FedFsLookupArgs (XDR *xdrs, FedFsLookupArgs *objp)
 {
+	register int32_t *buf;
+
 	 if (!xdr_FedFsPath (xdrs, &objp->path))
 		 return FALSE;
 	 if (!xdr_FedFsResolveType (xdrs, &objp->resolve))
@@ -179,6 +213,8 @@ xdr_FedFsLookupArgs (XDR *xdrs, FedFsLookupArgs *objp)
 bool_t
 xdr_FedFsLookupResOk (XDR *xdrs, FedFsLookupResOk *objp)
 {
+	register int32_t *buf;
+
 	 if (!xdr_FedFsFsn (xdrs, &objp->fsn))
 		 return FALSE;
 	 if (!xdr_array (xdrs, (char **)&objp->fsl.fsl_val, (u_int *) &objp->fsl.fsl_len, ~0,
@@ -190,6 +226,8 @@ xdr_FedFsLookupResOk (XDR *xdrs, FedFsLookupResOk *objp)
 bool_t
 xdr_FedFsLookupResReferralVal (XDR *xdrs, FedFsLookupResReferralVal *objp)
 {
+	register int32_t *buf;
+
 	 if (!xdr_FedFsNsdbName (xdrs, &objp->targetNsdb))
 		 return FALSE;
 	 if (!xdr_u_int (xdrs, &objp->ldapResultCode))
@@ -200,6 +238,8 @@ xdr_FedFsLookupResReferralVal (XDR *xdrs, FedFsLookupResReferralVal *objp)
 bool_t
 xdr_FedFsLookupRes (XDR *xdrs, FedFsLookupRes *objp)
 {
+	register int32_t *buf;
+
 	 if (!xdr_FedFsStatus (xdrs, &objp->status))
 		 return FALSE;
 	switch (objp->status) {
@@ -230,6 +270,8 @@ xdr_FedFsLookupRes (XDR *xdrs, FedFsLookupRes *objp)
 bool_t
 xdr_FedFsConnectionSec (XDR *xdrs, FedFsConnectionSec *objp)
 {
+	register int32_t *buf;
+
 	 if (!xdr_enum (xdrs, (enum_t *) objp))
 		 return FALSE;
 	return TRUE;
@@ -238,6 +280,8 @@ xdr_FedFsConnectionSec (XDR *xdrs, FedFsConnectionSec *objp)
 bool_t
 xdr_FedFsNsdbParams (XDR *xdrs, FedFsNsdbParams *objp)
 {
+	register int32_t *buf;
+
 	 if (!xdr_FedFsConnectionSec (xdrs, &objp->secType))
 		 return FALSE;
 	switch (objp->secType) {
@@ -254,6 +298,8 @@ xdr_FedFsNsdbParams (XDR *xdrs, FedFsNsdbParams *objp)
 bool_t
 xdr_FedFsSetNsdbParamsArgs (XDR *xdrs, FedFsSetNsdbParamsArgs *objp)
 {
+	register int32_t *buf;
+
 	 if (!xdr_FedFsNsdbName (xdrs, &objp->nsdbName))
 		 return FALSE;
 	 if (!xdr_FedFsNsdbParams (xdrs, &objp->params))
@@ -264,6 +310,8 @@ xdr_FedFsSetNsdbParamsArgs (XDR *xdrs, FedFsSetNsdbParamsArgs *objp)
 bool_t
 xdr_FedFsGetNsdbParamsRes (XDR *xdrs, FedFsGetNsdbParamsRes *objp)
 {
+	register int32_t *buf;
+
 	 if (!xdr_FedFsStatus (xdrs, &objp->status))
 		 return FALSE;
 	switch (objp->status) {
@@ -280,6 +328,8 @@ xdr_FedFsGetNsdbParamsRes (XDR *xdrs, FedFsGetNsdbParamsRes *objp)
 bool_t
 xdr_FedFsGetLimitedNsdbParamsRes (XDR *xdrs, FedFsGetLimitedNsdbParamsRes *objp)
 {
+	register int32_t *buf;
+
 	 if (!xdr_FedFsStatus (xdrs, &objp->status))
 		 return FALSE;
 	switch (objp->status) {

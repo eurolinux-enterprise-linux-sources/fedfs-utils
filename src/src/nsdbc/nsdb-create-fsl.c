@@ -105,11 +105,11 @@ nsdb_create_fsl_usage(const char *progname)
 int
 main(int argc, char **argv)
 {
-	char *nce, *servername, *serverpath;
+	char *nce, *fsn_uuid, *fsl_uuid, *servername, *serverpath;
 	char *progname, *binddn, *nsdbname;
 	unsigned short nsdbport, serverport;
-	uuid_t fsn_uu, fsl_uu;
 	struct fedfs_fsl *fsl;
+	unsigned int ldap_err;
 	FedFsStatus retval;
 	nsdb_t host;
 	int arg;
@@ -161,20 +161,22 @@ main(int argc, char **argv)
 				nsdb_create_fsl_usage(progname);
 			}
 			break;
-		case '?':
-			nsdb_create_fsl_usage(progname);
 		default:
 			fprintf(stderr, "Invalid command line "
 				"argument: %c\n", (char)arg);
+		case '?':
 			nsdb_create_fsl_usage(progname);
 		}
 	}
 	if (argc == optind + 4) {
-		if (uuid_parse(argv[optind], fsn_uu) == -1) {
+		uuid_t uu;
+		fsn_uuid = argv[optind];
+		if (uuid_parse(fsn_uuid, uu) == -1) {
 			fprintf(stderr, "Invalid FSN UUID was specified\n");
 			nsdb_create_fsl_usage(progname);
 		}
-		if (uuid_parse(argv[optind + 1], fsl_uu) == -1) {
+		fsl_uuid = argv[optind + 1];
+		if (uuid_parse(fsl_uuid, uu) == -1) {
 			fprintf(stderr, "Invalid FSL UUID was specified\n");
 			nsdb_create_fsl_usage(progname);
 		}
@@ -200,8 +202,8 @@ main(int argc, char **argv)
 		fprintf(stderr, "Failed to allocate FSL\n");
 		goto out;
 	}
-	uuid_unparse(fsn_uu, fsl->fl_fsnuuid);
-	uuid_unparse(fsl_uu, fsl->fl_fsluuid);
+	strcpy(fsl->fl_fsluuid, fsl_uuid);
+	strcpy(fsl->fl_fsnuuid, fsn_uuid);
 
 	retval = FEDFS_ERR_NAMETOOLONG;
 	if (strlen(servername) >= sizeof(fsl->fl_u.fl_nfsfsl.fn_fslhost)) {
@@ -246,7 +248,7 @@ main(int argc, char **argv)
 		goto out_free;
 	}
 
-	retval = nsdb_open_nsdb(host, binddn, NULL);
+	retval = nsdb_open_nsdb(host, binddn, NULL, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		break;
@@ -262,14 +264,14 @@ main(int argc, char **argv)
 			"to NSDB %s:%u\n", nsdbname, nsdbport);
 		goto out_free;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
-		switch (nsdb_ldaperr(host)) {
+		switch (ldap_err) {
 		case LDAP_INVALID_CREDENTIALS:
 			fprintf(stderr, "Incorrect password for DN %s\n",
 				binddn);
 			break;
 		default:
 			fprintf(stderr, "Failed to bind to NSDB %s:%u: %s\n",
-				nsdbname, nsdbport, nsdb_ldaperr2string(host));
+				nsdbname, nsdbport, ldap_err2string(ldap_err));
 		}
 		goto out_free;
 	default:
@@ -279,11 +281,11 @@ main(int argc, char **argv)
 		goto out_free;
 	}
 
-	retval = nsdb_create_fsls_s(host, nce, fsl);
+	retval = nsdb_create_fsls_s(host, nce, fsl, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		printf("Successfully created FSL record for %s under %s\n",
-				fsl->fl_fsluuid, nce);
+				fsl_uuid, nce);
 		break;
 	case FEDFS_ERR_NSDB_NONCE:
 		if (nce == NULL)
@@ -293,7 +295,7 @@ main(int argc, char **argv)
 			fprintf(stderr, "NCE %s does not exist\n", nce);
 		break;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
-		switch (nsdb_ldaperr(host)) {
+		switch (ldap_err) {
 		case LDAP_REFERRAL:
 			fprintf(stderr, "Encountered LDAP referral on %s:%u\n",
 				nsdbname, nsdbport);
@@ -304,12 +306,12 @@ main(int argc, char **argv)
 			break;
 		default:
 			fprintf(stderr, "Failed to create FSL %s: %s\n",
-				fsl->fl_fsluuid, nsdb_ldaperr2string(host));
+				fsl_uuid, ldap_err2string(ldap_err));
 		}
 		break;
 	default:
 		fprintf(stderr, "Failed to create FSL %s: %s\n",
-			fsl->fl_fsluuid, nsdb_display_fedfsstatus(retval));
+			fsl_uuid, nsdb_display_fedfsstatus(retval));
 	}
 
 	nsdb_close_nsdb(host);

@@ -35,7 +35,7 @@
 #include <locale.h>
 #include <langinfo.h>
 
-#include <sys/xattr.h>
+#include <attr/xattr.h>
 
 #include "junction.h"
 #include "junction-internal.h"

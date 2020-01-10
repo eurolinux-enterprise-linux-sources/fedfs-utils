@@ -149,6 +149,7 @@ nfsref_add_build_fsloc(const char *server, const char *rootpath,
 
 	retval = nsdb_posix_to_path_array(rootpath, &new->nfl_rootpath);
 	if (retval != FEDFS_OK) {
+		free(new->nfl_hostname);
 		nfs_free_location(new);
 		return retval;
 	}
@@ -260,6 +261,7 @@ nfsref_add_nfs_basic(const char *junct_path, char **argv, int optind)
 static FedFsStatus
 nfsref_add_create_fedfs_fsn(nsdb_t host, const char *nce, char **fsn_uuid)
 {
+	unsigned int ldap_err;
 	FedFsStatus retval;
 	char *fsnuuid;
 	uuid_t uu;
@@ -272,7 +274,8 @@ nfsref_add_create_fedfs_fsn(nsdb_t host, const char *nce, char **fsn_uuid)
 	uuid_generate_random(uu);
 	uuid_unparse(uu, fsnuuid);
 
-	retval = nsdb_create_fsn_s(host, nce, fsnuuid, FSN_DEFAULT_TTL);
+	retval = nsdb_create_fsn_s(host, nce, fsnuuid,
+					FSN_DEFAULT_TTL, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		xlog(D_GENERAL, "%s: Successfully created FSN record "
@@ -284,7 +287,7 @@ nfsref_add_create_fedfs_fsn(nsdb_t host, const char *nce, char **fsn_uuid)
 		break;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
 		xlog(L_ERROR, "Failed to create FSN: %s",
-			nsdb_ldaperr2string(host));
+			ldap_err2string(ldap_err));
 		break;
 	default:
 		xlog(L_ERROR, "Failed to create FSN: %s",
@@ -310,8 +313,7 @@ nfsref_add_nfs_fsl_defaults(const char *server, const char *rootpath,
 {
 	FedFsStatus retval;
 
-	if (strlen(server) >= sizeof(new->fn_fslhost))
-		return FEDFS_ERR_NAMETOOLONG;
+	/* XXX: check the server hostname length */
 	strcpy(new->fn_fslhost, server);
 	new->fn_fslport = 0;
 
@@ -374,10 +376,8 @@ nfsref_add_build_fsl(const char *fsn_uuid, const char *server,
 	strncpy(new->fl_fsnuuid, fsn_uuid, sizeof(new->fl_fsnuuid));
 
 	retval = nfsref_add_nfs_fsl_defaults(server, rootpath, &new->fl_u.fl_nfsfsl);
-	if (retval != FEDFS_OK) {
-		nsdb_free_fedfs_fsl(new);
+	if (retval != FEDFS_OK)
 		return retval;
-	}
 
 	*fsl = new;
 	return FEDFS_OK;
@@ -437,9 +437,10 @@ static FedFsStatus
 nfsref_add_create_fsls(const char *junct_path, nsdb_t host, const char *nce,
 		const char *fsn_uuid, struct fedfs_fsl *fsls)
 {
+	unsigned int ldap_err;
 	FedFsStatus retval;
 
-	retval = nsdb_create_fsls_s(host, nce, fsls);
+	retval = nsdb_create_fsls_s(host, nce, fsls, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		break;
@@ -448,7 +449,7 @@ nfsref_add_create_fsls(const char *junct_path, nsdb_t host, const char *nce,
 		return retval;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
 		xlog(L_ERROR, "Failed to create FSL records: %s\n",
-			nsdb_ldaperr2string(host));
+			ldap_err2string(ldap_err));
 		return retval;
 	default:
 		xlog(D_GENERAL, "%s: Failed to create FSL records: %s\n",
@@ -534,7 +535,8 @@ nfsref_add_nfs_fedfs_junction(const char *junct_path, char **argv, int optind,
 	retval = nfsref_add_create_fedfs_junction(junct_path, argv, optind,
 							host, nce, fsn_uuid);
 	if (retval != FEDFS_OK) {
-		nsdb_delete_fsn_s(host, nce, fsn_uuid, false);
+		unsigned int ldap_err;
+		nsdb_delete_fsn_s(host, nce, fsn_uuid, false, &ldap_err);
 		free(fsn_uuid);
 		return EXIT_FAILURE;
 	}
@@ -557,6 +559,7 @@ nfsref_add_nfs_fedfs(const char *junct_path, char **argv, int optind)
 {
 	char *binddn, *nsdbname, *nce;
 	unsigned short nsdbport;
+	unsigned int ldap_err;
 	FedFsStatus retval;
 	nsdb_t host = NULL;
 	int status = EXIT_FAILURE;
@@ -597,7 +600,7 @@ nfsref_add_nfs_fedfs(const char *junct_path, char **argv, int optind)
 		goto out_free;
 	}
 
-	retval = nsdb_open_nsdb(host, binddn, NULL);
+	retval = nsdb_open_nsdb(host, binddn, NULL, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		break;
@@ -613,7 +616,7 @@ nfsref_add_nfs_fedfs(const char *junct_path, char **argv, int optind)
 			"NSDB %s:%u", nsdbname, nsdbport);
 		goto out_free;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
-		switch (nsdb_ldaperr(host)) {
+		switch (ldap_err) {
 		case LDAP_INVALID_CREDENTIALS:
 			xlog(L_ERROR, "Incorrect password for DN %s",
 				binddn);
@@ -621,7 +624,7 @@ nfsref_add_nfs_fedfs(const char *junct_path, char **argv, int optind)
 		default:
 			xlog(L_ERROR, "Failed to bind to NSDB %s:%u: %s",
 				nsdbname, nsdbport,
-				nsdb_ldaperr2string(host));
+				ldap_err2string(ldap_err));
 		}
 		goto out_free;
 	default:

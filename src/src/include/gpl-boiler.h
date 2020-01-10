@@ -34,8 +34,7 @@
  * GPLv2 boilerplate for usage messages
  */
 static const char *fedfs_gpl_boilerplate =
-		"\nCopyright 2010, 2011, 2012, 2013 Oracle.  "
-		"All rights reserved.\n\n"
+		"\nCopyright 2010, 2011 Oracle.  All rights reserved.\n\n"
 		"License GPLv2: "
 		"<http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt>\n"
 		"This is free software.  "

@@ -7,7 +7,7 @@
 #
 
 #
-# Copyright 2010, 2011, 2012, 2013 Oracle.  All rights reserved.
+# Copyright 2010, 2011 Oracle.  All rights reserved.
 #
 # This file is part of fedfs-utils.
 #
@@ -27,17 +27,15 @@
 #
 
 AC_PREREQ([2.65])
-AC_INIT([fedfs-utils], [0.10.5], [fedfs-utils-devel@oss.oracle.com])
-AC_CANONICAL_BUILD([])
+AC_INIT([fedfs-utils], [0.9.2], [fedfs-utils-devel@oss.oracle.com])
+AC_CONFIG_SRCDIR([src])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
-AM_SILENT_RULES([yes])
 
 # Automake and libtools initialization
 m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
 LT_INIT
 AM_INIT_AUTOMAKE([-Wall -Werror silent-rules])
-AM_PATH_PYTHON([2.7])
 
 # configure command line options
 AC_ARG_WITH([fedfsuser],
@@ -58,7 +56,7 @@ AC_ARG_WITH([statedir],
 		[Define to the default pathname of the directory where fedfsd maintains persistent state.])
 
 # Publication date stamp for man pages
-pubdate="3 February 2014"
+pubdate=`date +"%e %B %Y"`
 AC_SUBST(pubdate)
 
 # Checks for programs.
@@ -141,16 +139,11 @@ AC_CHECK_LIB([ssl], [SSL_CTX_new],
 		 AC_DEFINE([HAVE_LIBSSL], [1],
 			   [Define if you have libssl])],
 		[AC_MSG_ERROR([libssl not found.])])
-AC_CHECK_LIB([gssapi_krb5], [gss_acquire_cred],
-		[AC_SUBST([LIBGSSAPI_KRB5], ["-lgssapi_krb5"])
-		 AC_DEFINE([HAVE_LIBGSSAPI_KRB5], [1],
-			   [Define if you have libgssapi_krb5])],
-		[AC_MSG_ERROR([libgssapi_krb5 not found.])])
-AC_CHECK_LIB([config], [config_lookup],
-		[AC_SUBST([LIBCONFIG], ["-lconfig"])
-		 AC_DEFINE([HAVE_LIBCONFIG], [1],
-			   [Define if you have libconfig])],
-		[AC_MSG_ERROR([libconfig not found.])])
+AC_CHECK_LIB([attr], [fgetxattr],
+		[AC_SUBST([LIBATTR], ["-lattr"])
+		 AC_DEFINE([HAVE_LIBATTR], [1],
+			   [Define if you have libattr])],
+		[AC_MSG_ERROR([libattr not found.])])
 
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h langinfo.h locale.h memory.h netdb.h netinet/in.h stdint.h stdlib.h string.h sys/socket.h syslog.h termios.h unistd.h wchar.h])
@@ -187,48 +180,11 @@ AC_CONFIG_FILES([Makefile
                  doc/Makefile
                  doc/ldap/Makefile
                  doc/man/Makefile
-                 doc/man/fedfs.7
-                 doc/man/nsdb-parameters.7
-                 doc/man/fedfs-create-junction.8
-                 doc/man/fedfs-create-replication.8
-                 doc/man/fedfs-delete-junction.8
-                 doc/man/fedfs-delete-replication.8
-                 doc/man/fedfs-domainroot.8
-                 doc/man/fedfs-get-limited-nsdb-params.8
-                 doc/man/fedfs-get-nsdb-params.8
-                 doc/man/fedfs-lookup-junction.8
-                 doc/man/fedfs-lookup-replication.8
-                 doc/man/fedfs-map-nfs4.8
-                 doc/man/fedfs-null.8
-                 doc/man/fedfs-set-nsdb-params.8
-                 doc/man/mount.fedfs.8
-                 doc/man/nfsref.8
-                 doc/man/nsdb-annotate.8
-                 doc/man/nsdb-create-fsl.8
-                 doc/man/nsdb-create-fsn.8
-                 doc/man/nsdb-delete-fsl.8
-                 doc/man/nsdb-delete-fsn.8
-                 doc/man/nsdb-delete-nsdb.8
-                 doc/man/nsdb-describe.8
-                 doc/man/nsdb-jumpstart.8
-                 doc/man/nsdb-list.8
-                 doc/man/nsdb-nces.8
-                 doc/man/nsdbparams.8
-                 doc/man/nsdb-remove-nci.8
-                 doc/man/nsdb-resolve-fsn.8
-                 doc/man/nsdb-simple-nce.8
-                 doc/man/nsdb-update-fsl.8
-                 doc/man/nsdb-update-nci.8
-                 doc/man/rpc.fedfsd.8
                  doc/rpcl/Makefile
                  src/Makefile
-                 src/domainroot/fedfs-domainroot
-                 src/domainroot/Makefile
                  src/fedfsc/Makefile
                  src/fedfsd/Makefile
                  src/include/Makefile
-                 src/jumpstart/nsdb-jumpstart
-                 src/jumpstart/Makefile
                  src/libadmin/Makefile
                  src/libjunction/Makefile
                  src/libnsdb/Makefile
@@ -239,9 +195,5 @@ AC_CONFIG_FILES([Makefile
                  src/nfsref/Makefile
                  src/nsdbc/Makefile
                  src/nsdbparams/Makefile
-                 src/PyFedfs/Makefile
-                 src/PyFedfs/domainroot/Makefile
-                 src/PyFedfs/jumpstart/Makefile
-                 src/plug-ins/Makefile
-                 sysconf/Makefile])
+                 src/plug-ins/Makefile])
 AC_OUTPUT

@@ -244,7 +244,8 @@ FedFsStatus	 nsdb_delete_nsdb(const char *hostname,
  * Connect an nsdb_t object to the server it represents
  */
 FedFsStatus	 nsdb_open_nsdb(nsdb_t host, const char *binddn,
-				const char *passwd);
+				const char *passwd,
+				unsigned int *ldap_err);
 
 /**
  * Finish a previously opened connection
@@ -269,8 +270,6 @@ const char	*nsdb_default_binddn(const nsdb_t host);
 const char	*nsdb_default_nce(const nsdb_t host);
 _Bool		 nsdb_follow_referrals(const nsdb_t host);
 const char	*nsdb_referred_to(const nsdb_t host);
-int		 nsdb_ldaperr(const nsdb_t host);
-const char	*nsdb_ldaperr2string(const nsdb_t host);
 
 /**
  * Data type helpers for nsdb_t objects
@@ -296,25 +295,29 @@ void		 nsdb_env(char **nsdbname, unsigned short *nsdbport,
  */
 FedFsStatus	 nsdb_create_fsn_s(nsdb_t host, const char *nce,
 				const char *fsn_uuid,
-				const unsigned int ttl);
+				const unsigned int ttl,
+				unsigned int *ldap_err);
 
 /**
  * Delete an FSN (5.1.2)
  */
 FedFsStatus	 nsdb_delete_fsn_s(nsdb_t host, const char *nce,
-				const char *fsn_uuid, _Bool leave_fsn);
+				const char *fsn_uuid, _Bool leave_fsn,
+				unsigned int *ldap_err);
 
 /**
  * Create one or more FSLs (5.1.3)
  */
 FedFsStatus	 nsdb_create_fsls_s(nsdb_t host, const char *nce,
-				struct fedfs_fsl *fsls);
+				struct fedfs_fsl *fsls,
+				unsigned int *ldap_err);
 
 /**
  * Delete an FSL (5.1.4)
  */
 FedFsStatus	 nsdb_delete_fsl_s(nsdb_t host, const char *nce,
-				const char *fsl_uuid);
+				const char *fsl_uuid,
+				unsigned int *ldap_err);
 
 /**
  * Update an FSL (5.1.5)
@@ -322,7 +325,8 @@ FedFsStatus	 nsdb_delete_fsl_s(nsdb_t host, const char *nce,
 FedFsStatus	 nsdb_update_fsl_s(nsdb_t host, const char *nce,
 				const char *fsl_uuid,
 				const char *attribute,
-				const void *value);
+				const void *value,
+				unsigned int *ldap_err);
 
 /**
  ** NSDB administrative operations defined by this implementation
@@ -332,34 +336,37 @@ FedFsStatus	 nsdb_update_fsl_s(nsdb_t host, const char *nce,
  * Create a simple "ou=fedfs" entry
  */
 FedFsStatus	 nsdb_create_simple_nce_s(nsdb_t host, const char *parent,
-				char **dn);
+				char **dn, unsigned int *ldap_err);
 
 /**
  * Update or remove NSDB container information
  */
-FedFsStatus	 nsdb_update_nci_s(nsdb_t host, const char *nce);
-FedFsStatus	 nsdb_remove_nci_s(nsdb_t host, const char *nce);
+FedFsStatus	 nsdb_update_nci_s(nsdb_t host, const char *nce,
+				unsigned int *ldap_err);
+FedFsStatus	 nsdb_remove_nci_s(nsdb_t host, const char *nce,
+				unsigned int *ldap_err);
 
 /**
  * Remove all FedFS entries on an NSDB
  */
-FedFsStatus	 nsdb_delete_nsdb_s(nsdb_t host, const char *nce);
+FedFsStatus	 nsdb_delete_nsdb_s(nsdb_t host, const char *nce,
+				unsigned int *ldap_err);
 
 /**
  * Display or alter an object's fedfsDescription attribute
  */
 FedFsStatus	 nsdb_description_add_s(nsdb_t host, const char *dn,
-				const char *description);
+				const char *description, unsigned int *ldap_err);
 FedFsStatus	 nsdb_description_delete_s(nsdb_t host, const char *dn,
-				const char *description);
+				const char *description, unsigned int *ldap_err);
 
 /**
  * Display or alter an object's fedfsAnnotation attribute
  */
 FedFsStatus	 nsdb_annotation_add_s(nsdb_t host, const char *dn,
-				const char *annotation);
+				const char *annotation, unsigned int *ldap_err);
 FedFsStatus	 nsdb_annotation_delete_s(nsdb_t host, const char *dn,
-				const char *annotation);
+				const char *annotation, unsigned int *ldap_err);
 
 /**
  ** NSDB file server operations defined in the
@@ -370,18 +377,21 @@ FedFsStatus	 nsdb_annotation_delete_s(nsdb_t host, const char *dn,
  * NSDB Container Entry enumeration (5.2.1)
  */
 FedFsStatus	 nsdb_get_ncedn_s(nsdb_t host, const char *naming_context,
-				char **dn);
-FedFsStatus	 nsdb_get_naming_contexts_s(nsdb_t host, char ***contexts);
+				char **dn, unsigned int *ldap_err);
+FedFsStatus	 nsdb_get_naming_contexts_s(nsdb_t host, char ***contexts,
+				unsigned int *ldap_err);
 FedFsStatus	 nsdb_find_naming_context_s(nsdb_t host, const char *entry,
-				char **context);
+				char **context, unsigned int *ldap_err);
 
 /**
  * Resolve an FSN (5.2.2)
  */
 FedFsStatus	 nsdb_resolve_fsn_s(nsdb_t host, const char *nce,
-				const char *fsn_uuid, struct fedfs_fsl **fsls);
+				const char *fsn_uuid, struct fedfs_fsl **fsls,
+				unsigned int *ldap_err);
 FedFsStatus	 nsdb_get_fsn_s(nsdb_t host, const char *nce,
-				const char *fsn_uuid, struct fedfs_fsn **fsn);
+				const char *fsn_uuid, struct fedfs_fsn **fsn,
+				unsigned int *ldap_err);
 
 /**
  ** NSDB fileserver operations defined by this implementation
@@ -390,18 +400,19 @@ FedFsStatus	 nsdb_get_fsn_s(nsdb_t host, const char *nce,
 /**
  * Enumerate FSNs
  */
-FedFsStatus	 nsdb_list_s(nsdb_t host, const char *nce, char ***fsns);
+FedFsStatus	 nsdb_list_s(nsdb_t host, const char *nce, char ***fsns,
+				unsigned int *ldap_err);
 
 /**
  * Ping an NSDB host
  */
-FedFsStatus	 nsdb_ping_nsdb_s(nsdb_t host);
+FedFsStatus	 nsdb_ping_nsdb_s(nsdb_t host, unsigned int *ldap_err);
 
 /**
  * Ping an LDAP server
  */
 FedFsStatus	 nsdb_ping_s(const char *hostname, const unsigned short port,
-				int *ldap_err);
+				unsigned int *ldap_err);
 
 /**
  * Enable LDAP debugging when contacting an NSDB

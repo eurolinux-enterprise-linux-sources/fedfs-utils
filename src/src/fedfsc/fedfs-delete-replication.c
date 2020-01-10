@@ -4,7 +4,7 @@
  */
 
 /*
- * Copyright 2010, 2013 Oracle.  All rights reserved.
+ * Copyright 2010 Oracle.  All rights reserved.
  *
  * This file is part of fedfs-utils.
  *
@@ -27,25 +27,30 @@
 #include <sys/stat.h>
 
 #include <stdbool.h>
-#include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
 #include <getopt.h>
 #include <locale.h>
 
+#include <rpc/clnt.h>
+
 #include "fedfs.h"
 #include "fedfs_admin.h"
-#include "admin.h"
 #include "nsdb.h"
 #include "junction.h"
 #include "xlog.h"
 #include "gpl-boiler.h"
 
 /**
+ * Default RPC request timeout
+ */
+static struct timeval fedfs_delete_replication_timeout = { 25, 0 };
+
+/**
  * Short form command line options
  */
-static const char fedfs_delete_replication_opts[] = "?dh:n:s:";
+static const char fedfs_delete_replication_opts[] = "?dh:n:";
 
 /**
  * Long form command line options
@@ -55,7 +60,6 @@ static const struct option fedfs_delete_replication_longopts[] = {
 	{ "help", 0, NULL, '?', },
 	{ "hostname", 1, NULL, 'h', },
 	{ "nettype", 1, NULL, 'n', },
-	{ "security", 1, NULL, 's', },
 	{ NULL, 0, NULL, 0, },
 };
 
@@ -63,9 +67,8 @@ static const struct option fedfs_delete_replication_longopts[] = {
  * Display program synopsis
  *
  * @param progname NUL-terminated C string containing name of program
- * @return program exit status
  */
-static int
+static void
 fedfs_delete_replication_usage(const char *progname)
 {
 	fprintf(stderr, "\n%s version " VERSION "\n", progname);
@@ -76,58 +79,10 @@ fedfs_delete_replication_usage(const char *progname)
 	fprintf(stderr, "\t-d, --debug          Enable debug messages\n");
 	fprintf(stderr, "\t-n, --nettype        RPC transport (default: 'netpath')\n");
 	fprintf(stderr, "\t-h, --hostname       ADMIN server hostname (default: 'localhost')\n");
-	fprintf(stderr, "\t-s, --security       RPC security level\n");
 
 	fprintf(stderr, "%s", fedfs_gpl_boilerplate);
 
-	return EXIT_FAILURE;
-}
-
-/**
- * Delete a replication on a remote fileserver
- *
- * @param host an initialized and opened admin_t
- * @param path_array an array of NUL-terminated C strings containing pathname components
- * @return program exit status
- */
-static int
-fedfs_delete_replication_try(admin_t host, char * const *path_array)
-{
-	int status, err;
-
-	status = EXIT_FAILURE;
-	err = admin_delete_replication(host, path_array);
-	switch (err) {
-	case 0:
-		break;
-	case EACCES:
-		xlog(L_ERROR, "%s: access denied", admin_hostname(host));
-		xlog(D_GENERAL, "%s",
-			admin_perror(host, admin_hostname(host)));
-		goto out;
-	case EIO:
-		xlog(L_ERROR, "%s",
-			admin_perror(host, admin_hostname(host)));
-		goto out;
-	default:
-		xlog(L_ERROR, "ADMIN client: %s", strerror(err));
-		goto out;
-	}
-
-	switch (admin_status(host)) {
-	case FEDFS_OK:
-		printf("Replication deleted successfully\n");
-		status = EXIT_SUCCESS;
-		break;
-	case FEDFS_ERR_NSDB_PARAMS:
-		printf("No connection parameters found\n");
-		break;
-	default:
-		nsdb_print_fedfsstatus(admin_status(host));
-	}
-
-out:
-	return status;
+	exit((int)FEDFS_ERR_INVAL);
 }
 
 /**
@@ -135,38 +90,59 @@ out:
  *
  * @param hostname NUL-terminated UTF-8 string containing ADMIN server's hostname
  * @param nettype NUL-terminated C string containing nettype to use for connection
- * @param security NUL-terminated C string containing RPC security mode
- * @param path_array an array of NUL-terminated C strings containing pathname components
- * @return program exit status
+ * @param path NUL-terminated C string containing remote pathname of replication to delete
+ * @return a FedFsStatus code
  */
-static int
-fedfs_delete_replication_host(const char *hostname, const char *nettype,
-		const char *security, char * const *path_array)
+static FedFsStatus
+fedfs_delete_replication_call(const char *hostname, const char *nettype,
+		const char *path)
 {
-	admin_t host;
-	int status;
+	enum clnt_stat status;
+	FedFsStatus result;
+	char **path_array;
+	CLIENT *client;
+	FedFsPath arg;
 
-	status = EXIT_FAILURE;
-	switch (admin_create(hostname, nettype, security, &host)) {
-	case 0:
-		status = fedfs_delete_replication_try(host, path_array);
-		admin_release(host);
-		break;
-	case EINVAL:
-		xlog(L_ERROR, "Invalid command line parameter");
-		break;
-	case EACCES:
-		xlog(L_ERROR, "Failed to authenticate server");
-		break;
-	case EKEYEXPIRED:
-		xlog(L_ERROR, "User credentials not found");
-		break;
-	default:
-		xlog(L_ERROR, "%s",
-			admin_open_perror(hostname));
+	memset(&arg, 0, sizeof(arg));
+
+	result = nsdb_posix_to_path_array(path, &path_array);
+	if (result != FEDFS_OK) {
+		fprintf(stderr, "Failed to encode pathname: %s",
+			nsdb_display_fedfsstatus(result));
+		return result;
+	}
+	result = nsdb_path_array_to_fedfspathname(path_array,
+					&arg.FedFsPath_u.adminPath);
+	if (result != FEDFS_OK) {
+		fprintf(stderr, "Failed to encode pathname: %s",
+			nsdb_display_fedfsstatus(result));
+		nsdb_free_string_array(path_array);
+		return result;
 	}
 
-	return status;
+	client = clnt_create(hostname, FEDFS_PROG, FEDFS_V1, nettype);
+	if (client == NULL) {
+		clnt_pcreateerror("Failed to create FEDFS client");
+		result = FEDFS_ERR_SVRFAULT;
+		goto out;
+	}
+
+	memset((char *)&result, 0, sizeof(result));
+	status = clnt_call(client, FEDFS_DELETE_REPLICATION,
+				(xdrproc_t)xdr_FedFsPath, (caddr_t)&arg,
+				(xdrproc_t)xdr_FedFsStatus, (caddr_t)&result,
+				fedfs_delete_replication_timeout);
+	if (status != RPC_SUCCESS) {
+		clnt_perror(client, "FEDFS_DELETE_REPLICATION call failed");
+		result = FEDFS_ERR_SVRFAULT;
+	} else
+		nsdb_print_fedfsstatus(result);
+	(void)clnt_destroy(client);
+
+out:
+	nsdb_free_fedfspathname(&arg.FedFsPath_u.adminPath);
+	nsdb_free_string_array(path_array);
+	return result;
 }
 
 /**
@@ -179,10 +155,10 @@ fedfs_delete_replication_host(const char *hostname, const char *nettype,
 int
 main(int argc, char **argv)
 {
-	char *progname, *hostname, *nettype, *security, *path;
-	FedFsStatus retval;
-	char **path_array;
-	int arg, status;
+	char *progname, *hostname, *nettype, *path;
+	unsigned int seconds;
+	FedFsStatus status;
+	int arg;
 
 	(void)setlocale(LC_ALL, "");
 	(void)umask(S_IRWXO);
@@ -200,7 +176,6 @@ main(int argc, char **argv)
 
 	hostname = "localhost";
 	nettype = "netpath";
-	security = "unix";
 	while ((arg = getopt_long(argc, argv, fedfs_delete_replication_opts, fedfs_delete_replication_longopts, NULL)) != -1) {
 		switch (arg) {
 		case 'd':
@@ -209,35 +184,33 @@ main(int argc, char **argv)
 		case 'h':
 			hostname = optarg;
 			break;
-		case 's':
-			security = optarg;
+		case 'p':
+			path = optarg;
 			break;
 		default:
 			fprintf(stderr, "Invalid command line argument: %c\n", (char)arg);
 		case '?':
-			return fedfs_delete_replication_usage(progname);
+			fedfs_delete_replication_usage(progname);
 		}
 	}
 	if (argc == optind + 1)
 		path = argv[optind];
 	else if (argc > optind + 1) {
 		fprintf(stderr, "Unrecognized positional parameters\n");
-		return fedfs_delete_replication_usage(progname);
+		fedfs_delete_replication_usage(progname);
 	} else {
 		fprintf(stderr, "No replication pathname was specified\n");
-		return fedfs_delete_replication_usage(progname);
+		fedfs_delete_replication_usage(progname);
 	}
 
-	retval = nsdb_posix_to_path_array(path, &path_array);
-	if (retval != FEDFS_OK) {
-		fprintf(stderr, "Failed to encode pathname: %s",
-			nsdb_display_fedfsstatus(retval));
-		return EXIT_FAILURE;
+	for (seconds = FEDFS_DELAY_MIN_SECS;; seconds = fedfs_delay(seconds)) {
+		status = fedfs_delete_replication_call(hostname, nettype, path);
+		if (status != FEDFS_ERR_DELAY)
+			break;
+
+		xlog(D_GENERAL, "Delaying %u seconds...", seconds);
+		if (sleep(seconds) != 0)
+			break;
 	}
-
-	status = fedfs_delete_replication_host(hostname, nettype,
-						security, path_array);
-
-	nsdb_free_string_array(path_array);
-	return status;
+	return (int)status;
 }

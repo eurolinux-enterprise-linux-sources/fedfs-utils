@@ -115,8 +115,11 @@ nsdb_sanitize_annotation(const char *in, char **out)
 	/* Assume worst case: every input character must be escaped */
 	len = strlen(in);
 	result = malloc(len * 2 + 1);
-	if (result == NULL)
+	if (result == NULL) {
+		xlog(D_GENERAL, "%s: Failed to allocate output buffer",
+			__func__);
 		return FEDFS_ERR_SVRFAULT;
+	}
 
 	for (i = 0, j = 0; i < len; i++) {
 		/* escape as needed */
@@ -159,8 +162,11 @@ nsdb_construct_annotation(const char *keyword, const char *value,
 	/* Assume worst case: every input character must be escaped */
 	buf = malloc(strlen(keyword) * 2 + strlen(value) * 2 +
 			strlen("\"\" = \"\""));
-	if (buf == NULL)
+	if (buf == NULL) {
+		xlog(D_GENERAL, "%s: Failed to allocate output buffer",
+			__func__);
 		return FEDFS_ERR_SVRFAULT;
+	}
 
 	buf[0] = '\0';
 	strcat(buf, "\"");
@@ -311,10 +317,15 @@ nsdb_parse_annotation(const char *annotation, size_t len,
 
 	/* Made up value that will always be large enough */
 	tmpkey = calloc(1, len);
-	if (tmpkey == NULL)
+	if (tmpkey == NULL) {
+		xlog(L_ERROR, "%s: Failed to allocate buffer for KEY",
+			__func__);
 		return FEDFS_ERR_SVRFAULT;
+	}
 	tmpval = calloc(1, len);
 	if (tmpval == NULL) {
+		xlog(L_ERROR, "%s: Failed to allocate buffer for KEY",
+			__func__);
 		free(tmpkey);
 		return FEDFS_ERR_SVRFAULT;
 	}

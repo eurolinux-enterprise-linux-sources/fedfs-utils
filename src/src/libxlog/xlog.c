@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <time.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -190,6 +191,9 @@ xlog_backend(int kind, const char *fmt, va_list args)
 
 	if (log_syslog) {
 		switch (kind) {
+		case L_FATAL:
+			vsyslog(LOG_ERR, fmt, args);
+			break;
 		case L_ERROR:
 			vsyslog(LOG_ERR, fmt, args);
 			break;
@@ -224,6 +228,9 @@ xlog_backend(int kind, const char *fmt, va_list args)
 		fprintf(stderr, "\n");
 		va_end(args2);
 	}
+
+	if (kind == L_FATAL)
+		exit(1);
 }
 
 /**
@@ -254,5 +261,20 @@ xlog_warn(const char* fmt, ...)
 
 	va_start(args, fmt);
 	xlog_backend(L_WARNING, fmt, args);
+	va_end(args);
+}
+
+/**
+ * Post a fatal log message
+ *
+ * @param fmt NUL-terminated C string containing printf-style format
+ */
+void
+xlog_err(const char* fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	xlog_backend(L_FATAL, fmt, args);
 	va_end(args);
 }

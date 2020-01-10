@@ -180,11 +180,8 @@ nsdbparams_list(const char *progname, int argc, char **argv)
 	if (!nsdbparams_drop_privileges(uid, gid))
 		return EXIT_FAILURE;
 
-	if (!nsdb_init_database()) {
-		xlog(L_ERROR, "Failed to initialize "
-			"NSDB connection parameters database");
+	if (!nsdb_init_database())
 		return EXIT_FAILURE;
-	}
 
 	status = nsdb_enumerate_nsdbs(&list);
 	switch (status) {

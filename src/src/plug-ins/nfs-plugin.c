@@ -290,6 +290,9 @@ nfs_jp_convert_fedfs_fsl(struct fedfs_fsl *fsl, struct nfs_fsloc **fsloc)
  * @param fsls a list of FedFS fileset locations
  * @param new empty set of NFS locations to fill in
  * @return a junction status code
+ *
+ * If nfs_jp_convert_fedfs_fsls() returns JP_OK, the caller must free the returned
+ * set of locations by calling nfs_jp_put_locations().
  */
 static enum jp_status
 nfs_jp_convert_fedfs_fsls(struct fedfs_fsl *fsls, nfs_fsloc_set_t new)
@@ -306,8 +309,10 @@ nfs_jp_convert_fedfs_fsls(struct fedfs_fsl *fsls, nfs_fsloc_set_t new)
 		enum jp_status status;
 
 		status = nfs_jp_convert_fedfs_fsl(fsl, &fsloc);
-		if (status != JP_OK)
+		if (status != JP_OK) {
+			nfs_jp_put_locations(new);
 			return status;
+		}
 
 		if (new->ns_list == NULL)
 			new->ns_list = fsloc;
@@ -374,6 +379,9 @@ nfs_jp_follow_ldap_referral(nsdb_t *host)
  * @param host an initialized NSDB host object
  * @param new empty set of NFS locations
  * @return a junction status code
+ *
+ * If nfs_jp_resolve_fsn() returns JP_OK, the caller must free the returned
+ * set of locations by calling nfs_jp_put_locations().
  */
 static enum jp_status
 nfs_jp_resolve_fsn(const char *fsn_uuid, nsdb_t host,
@@ -382,11 +390,12 @@ nfs_jp_resolve_fsn(const char *fsn_uuid, nsdb_t host,
 	enum jp_status status = JP_NSDBREMOTE;
 	struct fedfs_fsl *fsls;
 	struct fedfs_fsn *fsn;
+	unsigned int ldap_err;
 	FedFsStatus retval;
 	int fsn_ttl;
 
 again:
-	retval = nsdb_open_nsdb(host, NULL, NULL);
+	retval = nsdb_open_nsdb(host, NULL, NULL, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		break;
@@ -401,7 +410,7 @@ again:
 	case FEDFS_ERR_NSDB_LDAP_VAL:
 		nfs_jp_debug("%s: Failed to bind to NSDB %s:%u: %s\n",
 			nsdb_hostname(host), nsdb_port(host),
-			nsdb_ldaperr2string(host));
+			ldap_err2string(ldap_err));
 		return JP_NSDBLOCAL;
 	default:
 		nfs_jp_debug("%s: Failed to open NSDB %s:%u: %s\n",
@@ -410,7 +419,7 @@ again:
 		return JP_NSDBLOCAL;
 	}
 
-	retval = nsdb_get_fsn_s(host, NULL, fsn_uuid, &fsn);
+	retval = nsdb_get_fsn_s(host, NULL, fsn_uuid, &fsn, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		fsn_ttl = fsn->fn_fsnttl;
@@ -425,7 +434,7 @@ again:
 			__func__, fsn_uuid);
 		goto out_close;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
-		switch (nsdb_ldaperr(host)) {
+		switch (ldap_err) {
 		case LDAP_REFERRAL:
 			retval = nfs_jp_follow_ldap_referral(&host);
 			if (retval == FEDFS_OK)
@@ -437,7 +446,7 @@ again:
 			break;
 		default:
 			nfs_jp_debug("%s: NSDB operation failed with %s\n",
-				__func__, nsdb_ldaperr2string(host));
+				__func__, ldap_err2string(ldap_err));
 		}
 		goto out_close;
 	default:
@@ -446,7 +455,7 @@ again:
 		goto out_close;
 	}
 
-	retval = nsdb_resolve_fsn_s(host, NULL, fsn_uuid, &fsls);
+	retval = nsdb_resolve_fsn_s(host, NULL, fsn_uuid, &fsls, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		status = nfs_jp_convert_fedfs_fsls(fsls, new);
@@ -466,7 +475,7 @@ again:
 		break;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
 		nfs_jp_debug("%s: NSDB operation failed with %s\n",
-			__func__, nsdb_ldaperr2string(host));
+			__func__, ldap_err2string(ldap_err));
 		break;
 	default:
 		nfs_jp_debug("%s: Failed to resolve FSN %s: %s\n",
@@ -484,6 +493,9 @@ out_close:
  * @param junct_path NUL-terminated C string containing POSIX path of junction
  * @param new empty set of NFS locations
  * @return a junction status code
+ *
+ * If nfs_jp_resolve_fedfs_junction() returns JP_OK, the caller must free
+ * the returned set of locations by calling nfs_jp_put_locations().
  */
 static enum jp_status
 nfs_jp_resolve_fedfs_junction(const char *junct_path, nfs_fsloc_set_t new)

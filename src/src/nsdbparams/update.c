@@ -57,6 +57,7 @@ static const struct option nsdbparams_update_longopts[] = {
 	{ "gid", 1, NULL, 'g', },
 	{ "help", 0, NULL, '?', },
 	{ "nce", 1, NULL, 'e', },
+	{ "nsdbname", 1, NULL, 'l', },
 	{ "nsdbport", 1, NULL, 'r', },
 	{ "referral", 1, NULL, 'R', },
 	{ "sectype", 1, NULL, 't', },
@@ -101,8 +102,8 @@ nsdbparams_update_usage(const char *progname)
 static FedFsStatus
 nsdbparams_test_nsdb(const char *nsdbname, unsigned short nsdbport)
 {
+	unsigned int ldap_err;
 	FedFsStatus retval;
-	int ldap_err;
 
 	printf("Pinging NSDB %s:%u...\n", nsdbname, nsdbport);
 	fflush(stdout);
@@ -310,6 +311,9 @@ nsdbparams_update(const char *progname, int argc, char **argv)
 		case '?':
 			nsdbparams_update_usage(progname);
 			goto out;
+		case 'l':
+			nsdbname = optarg;
+			break;
 		case 'r':
 			if (!nsdb_parse_port_string(optarg, &nsdbport)) {
 				xlog(L_ERROR, "Bad port number: %s",
@@ -387,11 +391,8 @@ nsdbparams_update(const char *progname, int argc, char **argv)
 	if (!nsdbparams_drop_privileges(uid, gid))
 		goto out;
 
-	if (!nsdb_init_database()) {
-		xlog(L_ERROR, "Failed to initialize "
-			"NSDB connection parameters database");
+	if (!nsdb_init_database())
 		goto out;
-	}
 
 	retval = nsdb_lookup_nsdb(nsdbname, nsdbport, &host);
 	switch (retval) {

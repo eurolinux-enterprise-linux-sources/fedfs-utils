@@ -18,7 +18,7 @@
 
 [Unit]
 Description=FedFS administrative service daemon
-After=syslog.target network.target
+After=syslog.target
 
 [Service]
 EnvironmentFile=-/etc/sysconfig/fedfs

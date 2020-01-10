@@ -108,6 +108,7 @@ main(int argc, char **argv)
 	char *progname, *binddn, *nsdbname;
 	char *nce, *fsl_uuid;
 	unsigned short nsdbport;
+	unsigned int ldap_err;
 	FedFsStatus retval;
 	nsdb_t host;
 	int arg;
@@ -151,11 +152,10 @@ main(int argc, char **argv)
 				nsdb_delete_fsl_usage(progname);
 			}
 			break;
-		case '?':
-			nsdb_delete_fsl_usage(progname);
 		default:
 			fprintf(stderr, "Invalid command line "
 				"argument: %c\n", (char)arg);
+		case '?':
 			nsdb_delete_fsl_usage(progname);
 		}
 	}
@@ -206,7 +206,7 @@ main(int argc, char **argv)
 		goto out_free;
 	}
 
-	retval = nsdb_open_nsdb(host, binddn, NULL);
+	retval = nsdb_open_nsdb(host, binddn, NULL, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		break;
@@ -222,14 +222,14 @@ main(int argc, char **argv)
 			"to NSDB %s:%u\n", nsdbname, nsdbport);
 		goto out_free;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
-		switch (nsdb_ldaperr(host)) {
+		switch (ldap_err) {
 		case LDAP_INVALID_CREDENTIALS:
 			fprintf(stderr, "Incorrect password for DN %s\n",
 				binddn);
 			break;
 		default:
 			fprintf(stderr, "Failed to bind to NSDB %s:%u: %s\n",
-				nsdbname, nsdbport, nsdb_ldaperr2string(host));
+				nsdbname, nsdbport, ldap_err2string(ldap_err));
 		}
 		goto out_free;
 	default:
@@ -239,7 +239,7 @@ main(int argc, char **argv)
 		goto out_free;
 	}
 
-	retval = nsdb_delete_fsl_s(host, nce, fsl_uuid);
+	retval = nsdb_delete_fsl_s(host, nce, fsl_uuid, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		printf("Successfully deleted FSL record for %s under %s\n",
@@ -257,7 +257,7 @@ main(int argc, char **argv)
 			nsdbname, nsdbport, fsl_uuid);
 		break;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
-		switch (nsdb_ldaperr(host)) {
+		switch (ldap_err) {
 		case LDAP_REFERRAL:
 			fprintf(stderr, "Encountered LDAP referral on %s:%u\n",
 				nsdbname, nsdbport);
@@ -268,7 +268,7 @@ main(int argc, char **argv)
 			break;
 		default:
 			fprintf(stderr, "Failed to delete FSL %s: %s\n",
-				fsl_uuid, nsdb_ldaperr2string(host));
+				fsl_uuid, ldap_err2string(ldap_err));
 		}
 		break;
 	default:

@@ -97,10 +97,11 @@ nsdb_printable_ldap_mod_op(int op)
  */
 static int
 __nsdb_modify_nsdb_s(const char *func, LDAP *ld, const char *dn, LDAPMod *mod,
-		int *ldap_err)
+		unsigned int *ldap_err)
 {
 	char *uri, *attribute = mod->mod_type;
 	LDAPMod *mods[] = { mod, NULL };
+	int rc;
 
 	if (ldap_get_option(ld, LDAP_OPT_URI, &uri) == LDAP_OPT_SUCCESS) {
 		xlog(D_CALL, "%s: modifying %s (%s) at %s",
@@ -110,11 +111,12 @@ __nsdb_modify_nsdb_s(const char *func, LDAP *ld, const char *dn, LDAPMod *mod,
 		xlog(D_CALL, "%s: modifying %s (%s)",
 			func, dn, attribute);
 
-	*ldap_err = ldap_modify_ext_s(ld, dn, mods, NULL, NULL);
-	if (*ldap_err != LDAP_SUCCESS) {
+	rc = ldap_modify_ext_s(ld, dn, mods, NULL, NULL);
+	if (rc != LDAP_SUCCESS) {
 		xlog(D_GENERAL, "%s: failed to %s attribute %s: %s",
 				func, nsdb_printable_ldap_mod_op(mod->mod_op),
-				attribute, ldap_err2string(*ldap_err));
+				attribute, ldap_err2string(rc));
+		*ldap_err = (unsigned int)rc;
 		return FEDFS_ERR_NSDB_LDAP_VAL;
 	}
 	return FEDFS_OK;
@@ -140,12 +142,12 @@ nsdb_enable_ldap_debugging(void)
 #if 0
 	rc = ber_set_option(NULL, LBER_OPT_DEBUG_LEVEL, &debug);
 	if (rc != LBER_OPT_SUCCESS)
-		xlog(D_GENERAL, "Failed to set LBER_OPT_DEBUG_LEVEL");
+		xlog(L_ERROR, "Failed to set LBER_OPT_DEBUG_LEVEL");
 #endif
 
 	rc = ldap_set_option(NULL, LDAP_OPT_DEBUG_LEVEL, &debug);
 	if (rc != LDAP_OPT_SUCCESS )
-		xlog(D_GENERAL, "Failed to set LDAP_OPT_DEBUG_LEVEL");
+		xlog(L_ERROR, "Failed to set LDAP_OPT_DEBUG_LEVEL");
 }
 
 /**
@@ -287,7 +289,7 @@ nsdb_parse_singlevalue_bool(char *attr, struct berval **values, _Bool *result)
 	struct berval *value;
 
 	if (values[1] != NULL) {
-		xlog(D_CALL, "%s: Expecting only one value for attribute %s",
+		xlog(L_ERROR, "%s: Expecting only one value for attribute %s",
 			__func__, attr);
 		return FEDFS_ERR_NSDB_RESPONSE;
 	}
@@ -326,7 +328,7 @@ nsdb_parse_singlevalue_uchar(char *attr, struct berval **values,
 	long tmp;
 
 	if (values[1] != NULL) {
-		xlog(D_CALL, "%s: Expecting only one value for attribute %s",
+		xlog(L_ERROR, "%s: Expecting only one value for attribute %s",
 			__func__, attr);
 		return FEDFS_ERR_NSDB_RESPONSE;
 	}
@@ -360,7 +362,7 @@ nsdb_parse_singlevalue_int(char *attr, struct berval **values, int *result)
 	long tmp;
 
 	if (values[1] != NULL) {
-		xlog(D_CALL, "%s: Expecting only one value for attribute %s",
+		xlog(L_ERROR, "%s: Expecting only one value for attribute %s",
 			__func__, attr);
 		return FEDFS_ERR_NSDB_RESPONSE;
 	}
@@ -393,12 +395,12 @@ nsdb_parse_singlevalue_str(char *attr, struct berval **values,
 		char *result, const size_t len)
 {
 	if (len < strlen(values[0]->bv_val)) {
-		xlog(D_CALL, "%s: Value of attribute %s is too large",
+		xlog(L_ERROR, "%s: Value of attribute %s is too large",
 			__func__, attr);
 		return FEDFS_ERR_NSDB_RESPONSE;
 	}
 	if (values[1] != NULL) {
-		xlog(D_CALL, "%s: Expecting only one value for attribute %s",
+		xlog(L_ERROR, "%s: Expecting only one value for attribute %s",
 			__func__, attr);
 		return FEDFS_ERR_NSDB_RESPONSE;
 	}
@@ -427,12 +429,15 @@ nsdb_parse_multivalue_str(char *attr, struct berval **values, char ***result)
 
 	count = ldap_count_values_len(values);
 	tmp = calloc(count + 1, sizeof(char *));
-	if (tmp == NULL)
+	if (tmp == NULL) {
+		xlog(D_GENERAL, "%s: no memory for array", __func__);
 		return FEDFS_ERR_SVRFAULT;
+	}
 
 	for (i = 0; i < count; i++) {
 		tmp[i] = strdup(values[i]->bv_val);
 		if (tmp[i] == NULL) {
+			xlog(D_GENERAL, "%s: no memory for string", __func__);
 			nsdb_free_string_array(tmp);
 			return FEDFS_ERR_SVRFAULT;
 		}
@@ -457,7 +462,7 @@ nsdb_parse_multivalue_str(char *attr, struct berval **values, char ***result)
  */
 FedFsStatus
 nsdb_open(const char *hostname, const unsigned short port, LDAP **ld,
-		int *ldap_err)
+		unsigned int *ldap_err)
 {
 	int ldap_version, rc;
 	LDAPURLDesc url;
@@ -543,7 +548,7 @@ out_ldap_err:
  */
 FedFsStatus
 nsdb_bind(LDAP *ld, const char *binddn, const char *passwd,
-		int *ldap_err)
+		unsigned int *ldap_err)
 {
 	char *secret = (char *)passwd;
 	struct berval cred;
@@ -583,7 +588,7 @@ nsdb_bind(LDAP *ld, const char *binddn, const char *passwd,
  * @return a FedFsStatus code
  */
 FedFsStatus
-nsdb_start_tls(LDAP *ld, const char *certfile, int *ldap_err)
+nsdb_start_tls(LDAP *ld, const char *certfile, unsigned int *ldap_err)
 {
 	int value, rc;
 	char *uri;
@@ -663,7 +668,7 @@ out_ldap_err:
 FedFsStatus
 nsdb_add_attribute_s(LDAP *ld, const char *dn,
 		const char *attribute, struct berval *value,
-		int *ldap_err)
+		unsigned int *ldap_err)
 {
 	struct berval *attrvals[] = { value, NULL };
 	LDAPMod mod = {
@@ -700,7 +705,7 @@ nsdb_add_attribute_s(LDAP *ld, const char *dn,
  */
 FedFsStatus
 nsdb_modify_attribute_s(LDAP *ld, const char *dn, const char *attribute,
-		struct berval *value, int *ldap_err)
+		struct berval *value, unsigned int *ldap_err)
 {
 	struct berval *attrvals[] = { value, NULL };
 	LDAPMod mod = {
@@ -740,7 +745,7 @@ nsdb_modify_attribute_s(LDAP *ld, const char *dn, const char *attribute,
  */
 FedFsStatus
 nsdb_delete_attribute_s(LDAP *ld, const char *dn, const char *attribute,
-		struct berval *value, int *ldap_err)
+		struct berval *value, unsigned int *ldap_err)
 {
 	struct berval *attrvals[] = { value, NULL };
 	LDAPMod mod = {
@@ -782,7 +787,7 @@ nsdb_delete_attribute_s(LDAP *ld, const char *dn, const char *attribute,
  */
 FedFsStatus
 nsdb_delete_attribute_all_s(LDAP *ld, const char *dn,
-		const char *attribute, int *ldap_err)
+		const char *attribute, unsigned int *ldap_err)
 {
 	LDAPMod mod = {
 		.mod_op		= LDAP_MOD_DELETE,
@@ -813,13 +818,16 @@ nsdb_copy_referrals_array(char **refs, char ***referrals)
 		return FEDFS_OK;
 	count = i;
 
-	tmp = calloc(count + 1, sizeof(char *));
-	if (tmp == NULL)
+	tmp = calloc(count, sizeof(char *));
+	if (tmp == NULL) {
+		xlog(D_GENERAL, "%s: no memory for array", __func__);
 		return FEDFS_ERR_SVRFAULT;
+	}
 
 	for (i = 0; i < count; i++) {
 		tmp[i] = strdup(refs[i]);
 		if (tmp[i] == NULL) {
+			xlog(D_GENERAL, "%s: no memory for string", __func__);
 			nsdb_free_string_array(tmp);
 			return FEDFS_ERR_SVRFAULT;
 		}
@@ -845,18 +853,24 @@ nsdb_copy_referrals_array(char **refs, char ***referrals)
  */
 FedFsStatus
 nsdb_parse_result(LDAP *ld, LDAPMessage *result, char ***referrals,
-		int *ldap_err)
+		unsigned int *ldap_err)
 {
 	char *matched_dn = NULL, *error_msg = NULL;
+	int rc, result_code;
 	char **refs = NULL;
 	FedFsStatus retval;
-	int result_code;
 
-	*ldap_err = ldap_parse_result(ld, result, &result_code,
+	if (ld == NULL || result == NULL || ldap_err == NULL) {
+		xlog(L_ERROR, "%s: Invalid parameter", __func__);
+		return FEDFS_ERR_INVAL;
+	}
+
+	rc = ldap_parse_result(ld, result, &result_code,
 				&matched_dn, &error_msg, &refs, NULL, 0);
-	if (*ldap_err != LDAP_SUCCESS) {
+	if (rc != LDAP_SUCCESS) {
 		xlog(D_GENERAL, "%s: Failed to parse result: %s",
-			__func__, ldap_err2string(*ldap_err));
+			__func__, ldap_err2string(rc));
+		*ldap_err = rc;
 		return FEDFS_ERR_NSDB_LDAP_VAL;
 	}
 
@@ -957,8 +971,10 @@ nsdb_compare_dns(LDAPDN dn1, LDAPDN dn2)
 {
 	int count1, count2;
 
-	if (dn1 == NULL || dn2 == NULL)
+	if (dn1 == NULL || dn2 == NULL) {
+		xlog(L_ERROR, "%s: Invalid parameter", __func__);
 		return false;
+	}
 
 	for (count1 = 0; dn1[count1] != NULL; count1++);
 	for (count2 = 0; dn2[count2] != NULL; count2++);
@@ -986,7 +1002,7 @@ nsdb_compare_dns(LDAPDN dn1, LDAPDN dn2)
  */
 _Bool
 nsdb_compare_dn_string(LDAPDN dn1, const char *dn2_in,
-		int *ldap_err)
+		unsigned int *ldap_err)
 {
 	LDAPDN dn2 = NULL;
 	_Bool result;
@@ -994,8 +1010,10 @@ nsdb_compare_dn_string(LDAPDN dn1, const char *dn2_in,
 
 	result = false;
 
-	if (dn1 == NULL || dn2_in == NULL || ldap_err == NULL)
+	if (dn1 == NULL || dn2_in == NULL || ldap_err == NULL) {
+		xlog(L_ERROR, "%s: Invalid parameter", __func__);
 		goto out;
+	}
 
 	rc = ldap_str2dn(dn2_in, &dn2, LDAP_DN_FORMAT_LDAPV3);
 	if (rc != LDAP_SUCCESS) {
@@ -1024,7 +1042,7 @@ out:
  */
 _Bool
 nsdb_compare_dn_strings(const char *dn1_in, const char *dn2_in,
-		int *ldap_err)
+		unsigned int *ldap_err)
 {
 	LDAPDN dn1 = NULL;
 	LDAPDN dn2 = NULL;
@@ -1033,8 +1051,10 @@ nsdb_compare_dn_strings(const char *dn1_in, const char *dn2_in,
 
 	result = false;
 
-	if (dn1_in == NULL || dn2_in == NULL || ldap_err == NULL)
+	if (dn1_in == NULL || dn2_in == NULL || ldap_err == NULL) {
+		xlog(L_ERROR, "%s: Invalid parameter", __func__);
 		goto out;
+	}
 
 	rc = ldap_str2dn(dn1_in, &dn1, LDAP_DN_FORMAT_LDAPV3);
 	if (rc != LDAP_SUCCESS) {
@@ -1055,6 +1075,148 @@ out:
 	ldap_dnfree(dn2);
 	ldap_dnfree(dn1);
 	return result;
+}
+
+/**
+ * Strip an RDN from the left end of a DN
+ *
+ * @param dn IN/OUT: a structured LDAP distinguished name
+ * @param ldap_err OUT: possibly an LDAP error code
+ * @return a FedFsStatus code
+ *
+ * Caller must free returned "*dn" with ldap_dnfree(3).
+ *
+ * Convert "dn" to a string starting after the first RDN, then
+ * convert the resulting string back to an LDAPDN.
+ */
+FedFsStatus
+nsdb_left_remove_rdn(LDAPDN *dn, unsigned int *ldap_err)
+{
+	LDAPDN new, dn_in;
+	char *tmp = NULL;
+	int rc;
+
+	if (dn == NULL || ldap_err == NULL) {
+		xlog(L_ERROR, "%s: Invalid parameter", __func__);
+		return FEDFS_ERR_INVAL;
+	}
+
+	dn_in = *dn;
+	dn_in++;
+
+	rc = ldap_dn2str(dn_in, &tmp, LDAP_DN_FORMAT_LDAPV3);
+	if (rc != LDAP_SUCCESS) {
+		xlog(D_GENERAL, "%s: Failed to parse DN: %s",
+			__func__, ldap_err2string(rc));
+		*ldap_err = rc;
+		return FEDFS_ERR_NSDB_LDAP_VAL;
+	}
+
+	rc = ldap_str2dn(tmp, &new, LDAP_DN_FORMAT_LDAPV3);
+	free(tmp);
+	if (rc != LDAP_SUCCESS) {
+		xlog(D_GENERAL, "%s: Failed to unparse DN: %s",
+			__func__, ldap_err2string(rc));
+		*ldap_err = rc;
+		return FEDFS_ERR_NSDB_LDAP_VAL;
+	}
+
+	ldap_dnfree(*dn);
+	*dn = new;
+	return FEDFS_OK;
+}
+
+/**
+ * Append an RDN to the right end of a DN
+ *
+ * @param dn IN/OUT: a structured LDAP distinguished name
+ * @param rdn a structured LDAP relative distinguished name
+ * @param ldap_err OUT: possibly an LDAP error code
+ * @return a FedFsStatus code
+ *
+ * Caller must free returned "*dn" with ldap_dnfree(3).
+ *
+ * Convert both structured DNs to strings, concatenate them, then
+ * convert the resulting string back to an LDAPDN.
+ */
+FedFsStatus
+nsdb_right_append_rdn(LDAPDN *dn, LDAPRDN rdn, unsigned int *ldap_err)
+{
+	FedFsStatus retval;
+	char *rstr = NULL;
+	char *tmp = NULL;
+	char *buf = NULL;
+	LDAPDN new;
+	size_t len;
+	int rc;
+
+	if (dn == NULL || rdn == NULL || ldap_err == NULL) {
+		xlog(L_ERROR, "%s: Invalid parameter", __func__);
+		retval = FEDFS_ERR_INVAL;
+		goto out;
+	}
+
+	rc = ldap_rdn2str(rdn, &rstr, LDAP_DN_FORMAT_LDAPV3);
+	if (rc != LDAP_SUCCESS) {
+		xlog(D_GENERAL, "%s: Failed to parse RDN: %s",
+			__func__, ldap_err2string(rc));
+		*ldap_err = rc;
+		retval = FEDFS_ERR_NSDB_LDAP_VAL;
+		goto out;
+	}
+
+	if (*dn == NULL) {
+		rc = ldap_str2dn(rstr, &new, LDAP_DN_FORMAT_LDAPV3);
+		if (rc != LDAP_SUCCESS) {
+			xlog(D_GENERAL, "%s: Failed to unparse DN: %s",
+				__func__, ldap_err2string(rc));
+			*ldap_err = rc;
+			retval = FEDFS_ERR_NSDB_LDAP_VAL;
+			goto out;
+		}
+		goto out_success;
+	}
+
+	rc = ldap_dn2str(*dn, &tmp, LDAP_DN_FORMAT_LDAPV3);
+	if (rc != LDAP_SUCCESS) {
+		xlog(D_GENERAL, "%s: Failed to parse DN: %s",
+			__func__, ldap_err2string(rc));
+		*ldap_err = rc;
+		retval = FEDFS_ERR_NSDB_LDAP_VAL;
+		goto out;
+	}
+
+	len = strlen(tmp) + strlen(",") + strlen(rstr) + 1;
+	buf = malloc(len);
+	if (buf == NULL) {
+		xlog(D_GENERAL, "%s: no memory", __func__);
+		retval = FEDFS_ERR_SVRFAULT;
+		goto out;
+	}
+
+	strcpy(buf, tmp);
+	strcat(buf, ",");
+	strcat(buf, rstr);
+
+	rc = ldap_str2dn(buf, &new, LDAP_DN_FORMAT_LDAPV3);
+	if (rc != LDAP_SUCCESS) {
+		xlog(D_GENERAL, "%s: Failed to unparse DN: %s",
+			__func__, ldap_err2string(rc));
+		*ldap_err = rc;
+		retval = FEDFS_ERR_NSDB_LDAP_VAL;
+		goto out;
+	}
+
+out_success:
+	ldap_dnfree(*dn);
+	*dn = new;
+	retval = FEDFS_OK;
+
+out:
+	free(buf);
+	ldap_memfree(tmp);
+	free(rstr);
+	return retval;
 }
 
 /**
@@ -1094,7 +1256,7 @@ nsdb_ends_with(LDAPDN dn, LDAPDN suffix)
  */
 _Bool
 nsdb_dn_ends_with(const char *dn_in, const char *suffix_in,
-		int *ldap_err)
+		unsigned int *ldap_err)
 {
 	LDAPDN dn = NULL;
 	LDAPDN suffix = NULL;
@@ -1103,8 +1265,10 @@ nsdb_dn_ends_with(const char *dn_in, const char *suffix_in,
 
 	result = false;
 
-	if (dn_in == NULL || suffix_in == NULL || ldap_err == NULL)
+	if (dn_in == NULL || suffix_in == NULL || ldap_err == NULL) {
+		xlog(L_ERROR, "%s: Invalid parameter", __func__);
 		goto out;
+	}
 
 	rc = ldap_str2dn(dn_in, &dn, LDAP_DN_FORMAT_LDAPV3);
 	if (rc != LDAP_SUCCESS) {

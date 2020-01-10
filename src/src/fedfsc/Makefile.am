@@ -36,7 +36,7 @@ LDADD			= $(top_builddir)/src/libadmin/libadmin.la \
 			  $(top_builddir)/src/libxlog/libxlog.la \
 			  $(LIBTIRPC) $(LIBLDAP) $(LIBLBER) $(LIBXML2) \
 			  $(LIBSQLITE3) $(LIBIDN) $(LIBUUID) \
-			  $(LIBCRYPTO) $(LIBSSL) $(LIBGSSAPI_KRB5)
+			  $(LIBCRYPTO) $(LIBSSL)
 
 CLEANFILES		= cscope.in.out cscope.out cscope.po.out *~
 DISTCLEANFILES		= Makefile.in
@@ -45,4 +45,3 @@ AM_CFLAGS		= -ggdb -fstrict-aliasing \
 			  -Wall -Wextra -pedantic -Wformat=2 \
 			  -Wstrict-aliasing=2 -Wp,-D_FORTIFY_SOURCE=2
 AM_CPPFLAGS		= -I. -I$(top_srcdir)/src/include -I/usr/include/tirpc
-AM_LDFLAGS		= -Wl,--as-needed

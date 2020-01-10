@@ -24,8 +24,8 @@
 ##
 
 include_HEADERS		= nfs-plugin.h
-noinst_HEADERS		= admin.h fedfs_admin.h fedfs.h getsrvinfo.h \
-			  gpl-boiler.h junction.h list.h nsdb.h parse_opt.h \
+noinst_HEADERS		= fedfs_admin.h fedfs.h getsrvinfo.h gpl-boiler.h \
+			  junction.h list.h nsdb.h parse_opt.h \
 			  token.h xlog.h
 
 CLEANFILES		= cscope.in.out cscope.out cscope.po.out *~

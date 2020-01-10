@@ -98,6 +98,7 @@ main(int argc, char **argv)
 {
 	char *progname, *binddn, *nsdbname;
 	unsigned short nsdbport;
+	unsigned int ldap_err;
 	FedFsStatus retval;
 	nsdb_t host;
 	char *nce;
@@ -142,11 +143,10 @@ main(int argc, char **argv)
 				nsdb_remove_nci_usage(progname);
 			}
 			break;
-		case '?':
-			nsdb_remove_nci_usage(progname);
 		default:
 			fprintf(stderr, "Invalid command line "
 				"argument: %c\n", (char)arg);
+		case '?':
 			nsdb_remove_nci_usage(progname);
 		}
 	}
@@ -176,7 +176,7 @@ main(int argc, char **argv)
 
 	if (binddn == NULL)
 		binddn = (char *)nsdb_default_binddn(host);
-	retval = nsdb_open_nsdb(host, binddn, NULL);
+	retval = nsdb_open_nsdb(host, binddn, NULL, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		break;
@@ -192,14 +192,14 @@ main(int argc, char **argv)
 			"to NSDB %s:%u\n", nsdbname, nsdbport);
 		goto out_free;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
-		switch (nsdb_ldaperr(host)) {
+		switch (ldap_err) {
 		case LDAP_INVALID_CREDENTIALS:
 			fprintf(stderr, "Incorrect password for DN %s\n",
 				binddn);
 			break;
 		default:
 			fprintf(stderr, "Failed to bind to NSDB %s:%u: %s\n",
-				nsdbname, nsdbport, nsdb_ldaperr2string(host));
+				nsdbname, nsdbport, ldap_err2string(ldap_err));
 		}
 		goto out_free;
 	default:
@@ -211,7 +211,7 @@ main(int argc, char **argv)
 
 	if (nce == NULL)
 		nce = (char *)nsdb_default_nce(host);
-	retval = nsdb_remove_nci_s(host, nce);
+	retval = nsdb_remove_nci_s(host, nce, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		printf("Successfully removed NCI for NCE %s\n", nce);
@@ -220,7 +220,7 @@ main(int argc, char **argv)
 		fprintf(stderr, "NCE %s does not exist\n", nce);
 		break;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
-		switch (nsdb_ldaperr(host)) {
+		switch (ldap_err) {
 		case LDAP_REFERRAL:
 			fprintf(stderr, "Encountered LDAP referral on %s:%u\n",
 				nsdbname, nsdbport);
@@ -231,7 +231,7 @@ main(int argc, char **argv)
 			break;
 		default:
 			fprintf(stderr, "Failed to remove NCI for NCE %s: %s\n",
-				nce, nsdb_ldaperr2string(host));
+				nce, ldap_err2string(ldap_err));
 		}
 		break;
 	default:

@@ -42,7 +42,6 @@
 
 #include <netinet/in.h>
 #include <uuid/uuid.h>
-
 #include <rpc/rpc.h>
 #include <rpc/svc.h>
 
@@ -51,39 +50,6 @@
 #include "fedfsd.h"
 #include "junction.h"
 #include "xlog.h"
-
-/**
- * Predicate: Is caller authorized?
- *
- * @param rqstp incoming RPC request
- * @return true if caller is authorized to proceed
- */
-static _Bool
-fedfsd_is_authorized(struct svc_req *rqstp)
-{
-	_Bool authorized;
-
-	if (rqstp->rq_proc == FEDFS_NULL)
-		return true;
-
-	authorized = false;
-	switch (rqstp->rq_cred.oa_flavor) {
-	case AUTH_NONE:
-		authorized = fedfsd_auth_none();
-		break;
-	case AUTH_SYS:
-		authorized = fedfsd_auth_unix(rqstp);
-		break;
-	case RPCSEC_GSS:
-		authorized = fedfsd_auth_rpc_gss(rqstp);
-		break;
-	default:
-		xlog(L_ERROR, "Procedure %d used unsupported security flavor",
-			rqstp->rq_proc);
-	}
-
-	return authorized;
-}
 
 /**
  * Report calling client's IP address via xlog()
@@ -849,6 +815,7 @@ fedfsd_prepare_fedfsfsl_array(const struct fedfs_fsl *fsls,
 static void
 fedfsd_svc_lookup_junction_1(SVCXPRT *xprt)
 {
+	unsigned int ldap_err = 0;
 	FedFsLookupRes result;
 	FedFsLookupResOk *resok = &result.FedFsLookupRes_u.resok;
 	FedFsLookupArgs args;
@@ -917,15 +884,15 @@ again:
 	case FEDFS_RESOLVE_NONE:
 		break;
 	case FEDFS_RESOLVE_NSDB:
-		result.status = nsdb_open_nsdb(host, NULL, NULL);
+		result.status = nsdb_open_nsdb(host, NULL, NULL, &ldap_err);
 		if (result.status != FEDFS_OK)
 			break;
 
-		result.status = nsdb_resolve_fsn_s(host, NULL, fsn_uuid, &fsls);
+		result.status = nsdb_resolve_fsn_s(host, NULL, fsn_uuid,
+								&fsls, &ldap_err);
 		if (result.status == FEDFS_ERR_NSDB_LDAP_VAL) {
-			if (nsdb_ldaperr(host) != LDAP_REFERRAL) {
-				result.FedFsLookupRes_u.ldapResultCode =
-							nsdb_ldaperr(host);
+			if (ldap_err != LDAP_REFERRAL) {
+				result.FedFsLookupRes_u.ldapResultCode = ldap_err;
 				nsdb_close_nsdb(host);
 				break;
 			}
@@ -977,8 +944,8 @@ out:
 static FedFsStatus
 fedfsd_test_nsdb(const char *hostname, unsigned short port)
 {
+	unsigned int ldap_err;
 	FedFsStatus retval;
-	int ldap_err;
 
 	xlog(D_CALL, "%s: pinging %s:%u", __func__, hostname, port);
 
@@ -1000,14 +967,12 @@ fedfsd_test_nsdb(const char *hostname, unsigned short port)
 	case FEDFS_ERR_NSDB_LDAP_VAL:
 		xlog(D_GENERAL, "%s: failed to ping NSDB %s:%u: %s\n",
 			__func__, hostname, port,
-			ldap_err2string(ldap_err));
-		retval = FEDFS_ERR_NSDB_CONN;
+		ldap_err2string(ldap_err));
 		break;
 	default:
 		xlog(D_GENERAL, "%s: failed to ping NSDB %s:%u: %s",
 			__func__, hostname, port,
 			nsdb_display_fedfsstatus(retval));
-		retval = FEDFS_ERR_NSDB_CONN;
 	}
 
 	return retval;
@@ -1053,6 +1018,7 @@ fedfsd_svc_set_nsdb_params_1(SVCXPRT *xprt)
 		case FEDFS_ERR_NSDB_AUTH:
 			if (args.params.secType == FEDFS_SEC_NONE)
 				goto out;
+			result = FEDFS_OK;
 			break;
 		default:
 			goto out;
@@ -1350,17 +1316,7 @@ fedfsd_dispatch_1(struct svc_req *rqstp, SVCXPRT *xprt)
 {
 	char addrbuf[INET6_ADDRSTRLEN];
 
-	if (fedfsd_no_dispatch)
-		return;
-
 	fedfsd_caller(rqstp, addrbuf, sizeof(addrbuf));
-
-	if (!fedfsd_is_authorized(rqstp)) {
-		xlog(L_WARNING, "Caller from %s is unauthorized", addrbuf);
-		svcerr_auth(xprt, AUTH_REJECTEDCRED);
-		return;
-	}
-
 	switch (rqstp->rq_proc) {
 	case NULLPROC:
 		xlog(D_CALL, "%s: Received NULLPROC request from %s",

@@ -1,0 +1,188 @@
+.\"@(#)mount.fedfs.8"
+.\"
+.\" @file doc/man/mount.fedfs.8
+.\" @brief man page for mount.fedfs subcommand
+.\"
+
+.\"
+.\" Copyright 2011 Oracle.  All rights reserved.
+.\"
+.\" This file is part of fedfs-utils.
+.\"
+.\" fedfs-utils is free software; you can redistribute it and/or modify
+.\" it under the terms of the GNU General Public License version 2.0 as
+.\" published by the Free Software Foundation.
+.\"
+.\" fedfs-utils is distributed in the hope that it will be useful, but
+.\" WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU General Public License version 2.0 for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License
+.\" version 2.0 along with fedfs-utils.  If not, see:
+.\"
+.\"	http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+.\"
+.TH MOUNT.FEDFS 8 "2 July 2013"
+.SH NAME
+mount.fedfs \- mount a FedFS domain root
+.SH SYNOPSIS
+.B mount.fedfs
+.I remotedir localdir
+.RB [ \-fhnrsvVw ]
+.RB [ \-o
+.IR options ]
+.SH DESCRIPTION
+RFC 5716 introduces the Federated File System (FedFS, for short).
+FedFS is an extensible standardized mechanism
+by which system administrators construct
+a coherent namespace across multiple file servers using
+.IR "file system referrals" .
+For further details, see
+.BR fedfs (7).
+.P
+The
+.BR mount.fedfs (8)
+command locates FedFS domains by looking for DNS SRV records
+that advertise file servers exporting FedFS domain root replicas.
+The
+.I remotedir
+argument determines what FedFS domain is mounted and
+what network file system protocol is used.
+.P
+The
+.BR mount.fedfs (8)
+command sorts the list of available domain root replicas
+according to the SRV record sorting rules outlined in RFC 2782.
+It attempts to contact each file server
+appearing in the SRV record list
+until a mount request succeeds
+or the end of the SRV record list is reached.
+.SS Command line arguments
+The first argument,
+.IR remotedir ,
+is the
+.I globally useful name
+to mount.
+Globally useful names are discussed in more detail in
+.BR fedfs (7).
+.P
+The second argument,
+.IR localdir ,
+specifies the local directory on which to mount the requested
+FedFS globally useful name.
+As with other file systems,
+.I localdir
+must exist on the client for a mount request to succeed.
+.P
+The
+.BR mount.fedfs (8)
+command converts the specified
+.I remotedir
+and
+.I localdir
+arguments, along with information obtained via DNS SRV queries,
+to arguments suitable for a local mount request.
+It then forks and execs the
+appropriate file system mount subcommand (such as the
+.BR mount.nfs (8)
+subcommand) to mount the file server where the domain root resides.
+.P
+Because an unmodified file system mount subcommand
+is used for the actual mount operation,
+the file system's equivalent umount subcommand
+is all that is required to unmount this mount point when it is
+finished being used.
+.SS Options
+.IP "\fB\-f, \-\-fake"
+Fake mount.  This option is ignored by
+.BR mount.fedfs (8)
+but is passed to the underlying file system mount subcommand.
+.IP "\fB\-h, \-\-help\fP"
+Print the
+.BR mount.fedfs (8)
+usage message and exit.
+.IP "\fB\-n, \-\-no\-mtab\fP"
+Do not update
+.IR /etc/mtab .
+This option is ignored by
+.BR mount.fedfs (8)
+but is passed to the underlying file system mount subcommand.
+.IP "\fB\-o, \-\-options \fIoptions\fP"
+Specify mount options for this mount point and all submounts.
+These are ignored by
+.BR mount.fedfs (8)
+but are passed to the underlying file system mount subcommand.
+For further details, refer to
+.BR mount (8).
+.IP "\fB\-r, \-\-ro, \-\-read\-only\fP"
+Mount the domain root and all submounts read-only.
+.IP "\fB\-s, \-\-sloppy\fP"
+Tolerate unrecognized mount options.  This is ignored by
+.BR mount.fedfs (8)
+but is passed to the underlying file system mount subcommand.
+.IP "\fB\-v, \-\-verbose\fP"
+Report more information during the mount process.
+This affects
+.BR mount.fedfs (8)
+and is also passed to the underlying file system mount subcommand.
+.IP "\fB\-V, \-\-version\fP"
+Print version information for
+.BR mount.fedfs(8)
+and exit.
+.IP "\fB\-w, \-\-rw, \-\-read-write\fP"
+Mount the domain root and all submounts read-write.  This is the default behavior.
+.SH EXAMPLES
+To mount the domain root of the
+.I example.net
+FedFS domain via NFS version 4 automatically, you might add this to your
+.IR /etc/fstab :
+.RS
+.sp
+/nfs4/example.net   /nfs4/example.net   fedfs  defaults  0  0
+.sp
+.RE
+A FedFS domain root can also be mounted with a stand-alone invocation of
+.BR mount (8):
+.RS
+.sp
+# mount -t fedfs /nfs4/example.net /mnt/fedfs
+.sp
+.RE
+This mounts the FedFS domain root for the
+.I example.net
+domain on the client's
+.I /mnt/fedfs
+directory.
+A simple
+.RS
+.sp
+# umount /mnt/fedfs
+.sp
+.RE
+unmounts it when you are finished with it.
+.SH FILES
+.TP 18n
+.I /etc/fstab
+filesystem table
+.TP
+.I /etc/mtab
+table of mounted file systems
+.SH "SEE ALSO"
+.BR fedfs (7),
+.BR nfs (5),
+.BR mount (8),
+.BR mount.nfs (8)
+.sp
+RFC 2782 for a discussion of DNS SRV records
+.sp
+RFC 3530 for a description of NFS version 4 referrals
+.sp
+RFC 5716 for FedFS requirements and overview
+.SH COLOPHON
+This page is part of the fedfs-utils package.
+A description of the project and information about reporting bugs
+can be found at
+.IR http://wiki.linux-nfs.org/wiki/index.php/FedFsUtilsProject .
+.SH "AUTHOR"
+Chuck Lever <chuck.lever@oracle.com>

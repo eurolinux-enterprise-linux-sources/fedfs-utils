@@ -1,6 +1,6 @@
 /*
  * @file src/libnsdb/nsdb-internal.h
- * @brief Private declarations for the NSDB API
+ * @brief Common public declarations for the NSDB API
  */
 
 /*
@@ -46,7 +46,6 @@ struct fedfs_nsdb {
 	char *			fn_default_nce;
 	_Bool			fn_follow_referrals;
 	char **			fn_referrals;
-	int			fn_ldaperr;
 };
 
 /**
@@ -79,38 +78,41 @@ FedFsStatus	 nsdb_parse_multivalue_str(char *attr,
 
 FedFsStatus	 nsdb_open(const char *hostname,
 				const unsigned short port, LDAP **ld,
-				int *ldap_err);
+				unsigned int *ldap_err);
 FedFsStatus	 nsdb_bind(LDAP *ld, const char *binddn,
 				const char *passwd,
-				int *ldap_err);
+				unsigned int *ldap_err);
 FedFsStatus	 nsdb_start_tls(LDAP *ld, const char *certfile,
-				int *ldap_err);
+				unsigned int *ldap_err);
 
 FedFsStatus	 nsdb_add_attribute_s(LDAP *ld, const char *dn,
 				const char *attribute,
 				struct berval *value,
-				int *ldap_err);
+				unsigned int *ldap_err);
 FedFsStatus	 nsdb_modify_attribute_s(LDAP *ld, const char *dn,
 				const char *attribute,
 				struct berval *value,
-				int *ldap_err);
+				unsigned int *ldap_err);
 FedFsStatus	 nsdb_delete_attribute_s(LDAP *ld, const char *dn,
 				const char *attribute,
 				struct berval *value,
-				int *ldap_err);
+				unsigned int *ldap_err);
 FedFsStatus	 nsdb_delete_attribute_all_s(LDAP *ld, const char *dn,
 				const char *attribute,
-				int *ldap_err);
+				unsigned int *ldap_err);
 FedFsStatus	 nsdb_parse_result(LDAP *ld, LDAPMessage *result,
-				char ***referrals, int *ldap_err);
+				char ***referrals, unsigned int *ldap_err);
 _Bool		 nsdb_compare_dns(LDAPDN dn1, LDAPDN dn2);
 _Bool		 nsdb_compare_dn_string(LDAPDN dn1, const char *dn2_in,
-				int *ldap_err);
+				unsigned int *ldap_err);
 _Bool		 nsdb_compare_dn_strings(const char *dn1_in,
 				const char *dn2_in,
-				int *ldap_err);
+				unsigned int *ldap_err);
+FedFsStatus	 nsdb_left_remove_rdn(LDAPDN *dn, unsigned int *ldap_err);
+FedFsStatus	 nsdb_right_append_rdn(LDAPDN *dn, LDAPRDN rdn,
+				unsigned int *ldap_err);
 _Bool		 nsdb_dn_ends_with(const char *dn_in, const char *suffix_in,
-				int *ldap_err);
+				unsigned int *ldap_err);
 
 
 /**

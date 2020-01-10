@@ -96,6 +96,7 @@ main(int argc, char **argv)
 {
 	char *progname, *nsdbname;
 	unsigned short nsdbport;
+	unsigned int ldap_err;
 	FedFsStatus retval;
 	char **contexts;
 	nsdb_t host;
@@ -134,11 +135,10 @@ main(int argc, char **argv)
 				nsdb_nces_usage(progname);
 			}
 			break;
-		case '?':
-			nsdb_nces_usage(progname);
 		default:
 			fprintf(stderr, "Invalid command line "
 				"argument: %c\n", (char)arg);
+		case '?':
 			nsdb_nces_usage(progname);
 		}
 	}
@@ -166,7 +166,7 @@ main(int argc, char **argv)
 		goto out;
 	}
 
-	retval = nsdb_open_nsdb(host, NULL, NULL);
+	retval = nsdb_open_nsdb(host, NULL, NULL, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		break;
@@ -180,7 +180,7 @@ main(int argc, char **argv)
 		goto out_free;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
 		fprintf(stderr, "Failed to bind to NSDB %s:%u: %s\n",
-			nsdbname, nsdbport, nsdb_ldaperr2string(host));
+			nsdbname, nsdbport, ldap_err2string(ldap_err));
 		goto out_free;
 	default:
 		fprintf(stderr, "Failed to open NSDB %s:%u: %s\n",
@@ -189,12 +189,12 @@ main(int argc, char **argv)
 		goto out_free;
 	}
 
-	retval = nsdb_get_naming_contexts_s(host, &contexts);
+	retval = nsdb_get_naming_contexts_s(host, &contexts, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		break;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
-		switch (nsdb_ldaperr(host)) {
+		switch (ldap_err) {
 		case LDAP_REFERRAL:
 			fprintf(stderr, "Encountered LDAP referral on %s:%u\n",
 				nsdbname, nsdbport);
@@ -205,7 +205,7 @@ main(int argc, char **argv)
 			break;
 		default:
 			fprintf(stderr, "Failed to list NCEs: %s\n",
-				nsdb_ldaperr2string(host));
+				ldap_err2string(ldap_err));
 		}
 		goto out_close;
 	default:
@@ -219,7 +219,7 @@ main(int argc, char **argv)
 	for (i = 0; contexts[i] != NULL; i++) {
 		char *dn;
 
-		retval = nsdb_get_ncedn_s(host, contexts[i], &dn);
+		retval = nsdb_get_ncedn_s(host, contexts[i], &dn, &ldap_err);
 		printf("  namingContext '%s' ", contexts[i]);
 		if (retval == FEDFS_OK) {
 			printf("hosts an NCE at '%s'.\n", dn);

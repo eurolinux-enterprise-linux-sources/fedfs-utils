@@ -23,8 +23,7 @@
 ##	http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
 ##
 
-MISC_DOCS		= fedfs.7 nsdb-parameters.7
-ADMIN_CLIENT_CMDS	= fedfs-create-junction.8 fedfs-create-replication.8 \
+FEDFS_CLIENT_CMDS	= fedfs-create-junction.8 fedfs-create-replication.8 \
 			  fedfs-delete-junction.8 fedfs-delete-replication.8 \
 			  fedfs-lookup-junction.8 fedfs-lookup-replication.8 \
 			  fedfs-get-nsdb-params.8 fedfs-set-nsdb-params.8 \
@@ -36,14 +35,28 @@ NSDB_CLIENT_CMDS	= nsdb-create-fsl.8 nsdb-create-fsn.8 \
 			  nsdb-list.8 nsdb-nces.8 \
 			  nsdb-update-nci.8 nsdb-remove-nci.8 \
 			  nsdb-delete-nsdb.8 nsdb-simple-nce.8
-PYTHON_CMDS		= fedfs-domainroot.8 nsdb-jumpstart.8
-MISC_CMDS		= rpc.fedfsd.8 nsdbparams.8 nfsref.8
-MOUNT_CMDS		= mount.fedfs.8 fedfs-map-nfs4.8
 
-man_MANS		= $(MISC_DOCS) $(MISC_CMDS) $(PYTHON_CMDS) \
-			  $(ADMIN_CLIENT_CMDS) $(NSDB_CLIENT_CMDS) \
-			  $(MOUNT_CMDS)
-
+dist_man7_MANS		= fedfs.7 nsdb-parameters.7
+dist_man8_MANS		= rpc.fedfsd.8 mount.fedfs.8 fedfs-map-nfs4.8 nfsref.8 \
+			  nsdbparams.8 $(FEDFS_CLIENT_CMDS) $(NSDB_CLIENT_CMDS)
 
 CLEANFILES		= cscope.in.out cscope.out cscope.po.out *~
 DISTCLEANFILES		= Makefile.in
+
+dist-hook:
+	(cd $(distdir) && \
+	  for p in $(dist_man7_MANS) $(dist_man8_MANS); do \
+	    $(SED) -i 's,[@]publication-date@,$(pubdate),' $$p ;\
+	  done)
+
+install-data-hook:
+	(cd $(DESTDIR)$(mandir)/man7 && \
+	  for p in $(dist_man7_MANS); do \
+	    $(SED) -i 's,[@]statedir@,$(statedir),' $$p ;\
+	    $(SED) -i 's,[@]fedfsuser@,$(fedfsuser),' $$p ;\
+	  done)
+	(cd $(DESTDIR)$(mandir)/man8 && \
+	  for p in $(dist_man8_MANS); do \
+	    $(SED) -i 's,[@]statedir@,$(statedir),' $$p ;\
+	    $(SED) -i 's,[@]fedfsuser@,$(fedfsuser),' $$p ;\
+	  done)

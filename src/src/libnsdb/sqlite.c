@@ -57,15 +57,16 @@ nsdb_open_db(const char *db_filename, int flags)
 
 	rc = sqlite3_initialize();
 	if (rc != SQLITE_OK) {
-		xlog(D_GENERAL, "%s: Failed to initialize sqlite3: %d",
-			__func__, rc);
+		xlog(L_ERROR, "Failed to initialize sqlite3: %d", rc);
 		return NULL;
 	}
 
 	rc = sqlite3_open_v2(db_filename, &db, flags, NULL);
 	if (rc != SQLITE_OK) {
-		xlog(D_GENERAL, "%s: Failed to open sqlite3 database in %s: %s",
-			__func__, db_filename, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to open sqlite3 database in %s: %s",
+			db_filename, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Check that the full database pathname is correct, and that");
+		xlog(L_ERROR, "the database file exists and has proper permissions");
 		(void)sqlite3_close(db);
 		return NULL;
 	}
@@ -90,13 +91,12 @@ nsdb_close_db(sqlite3 *db)
 
 	rc = sqlite3_close(db);
 	if (rc != SQLITE_OK)
-		xlog(D_GENERAL, "%s: Failed to close sqlite3 database: %s",
-			__func__, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to close sqlite3 database: %s",
+			sqlite3_errmsg(db));
 
 	rc = sqlite3_shutdown();
 	if (rc != SQLITE_OK)
-		xlog(D_GENERAL, "%s: Failed to shut sqlite3 down: %d",
-			__func__, rc);
+		xlog(L_ERROR, "Failed to shut sqlite3 down: %d", rc);
 }
 
 /**
@@ -114,9 +114,9 @@ nsdb_prepare_stmt(sqlite3 *db, sqlite3_stmt **stmt, const char *sql)
 
 	rc = sqlite3_prepare_v2(db, sql, -1, stmt, NULL);
 	if (rc != SQLITE_OK) {
-		xlog(D_GENERAL, "%s: Failed to compile SQL: %s",
-			__func__, sqlite3_errmsg(db));
-		xlog(D_GENERAL, "%s: SQL: %s", __func__, sql);
+		xlog(L_ERROR, "Failed to compile SQL: %s",
+			sqlite3_errmsg(db));
+		xlog(L_ERROR, "SQL: %s", sql);
 		return false;
 	}
 	return true;
@@ -140,8 +140,8 @@ nsdb_finalize_stmt(sqlite3_stmt *stmt)
 	case SQLITE_CONSTRAINT:
 		break;
 	default:
-		xlog(D_GENERAL, "%s: Failed to finalize SQL statement: %s",
-			__func__, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to finalize SQL statement: %s",
+			sqlite3_errmsg(db));
 	}
 }
 
@@ -161,8 +161,7 @@ nsdb_begin_transaction(sqlite3 *db)
 	rc = sqlite3_exec(db, "BEGIN IMMEDIATE TRANSACTION;",
 					NULL, NULL, &err_msg);
 	if (rc != SQLITE_OK) {
-		xlog(D_GENERAL, "%s: Failed to start transaction: %s",
-			__func__, err_msg);
+		xlog(L_ERROR, "Failed to start transaction: %s", err_msg);
 		sqlite3_free(err_msg);
 		return false;
 	}
@@ -185,8 +184,7 @@ nsdb_end_transaction(sqlite3 *db)
 	err_msg = NULL;
 	rc = sqlite3_exec(db, "COMMIT TRANSACTION;", NULL, NULL, &err_msg);
 	if (rc != SQLITE_OK) {
-		xlog(D_GENERAL, "%s: Failed to commit transaction: %s",
-			__func__, err_msg);
+		xlog(L_ERROR, "Failed to commit transaction: %s", err_msg);
 		sqlite3_free(err_msg);
 		return;
 	}
@@ -208,8 +206,7 @@ nsdb_rollback_transaction(sqlite3 *db)
 	err_msg = NULL;
 	rc = sqlite3_exec(db, "ROLLBACK TRANSACTION;", NULL, NULL, &err_msg);
 	if (rc != SQLITE_OK) {
-		xlog(D_GENERAL, "%s: Failed to roll back transaction: %s",
-			__func__, err_msg);
+		xlog(L_ERROR, "Failed to roll back transaction: %s", err_msg);
 		sqlite3_free(err_msg);
 		return;
 	}
@@ -236,8 +233,8 @@ nsdb_create_table(sqlite3 *db, const char *table_name, const char *table_def)
 
 	sql = sqlite3_mprintf("CREATE TABLE %q (%q);", table_name, table_def);
 	if (sql == NULL) {
-		xlog(D_GENERAL, "%s: Failed to construct SQL command while "
-			"creating table %s", __func__, table_name);
+		xlog(L_ERROR, "Failed to construct SQL command while "
+			"creating table %s", table_name);
 		return false;
 	}
 
@@ -250,17 +247,16 @@ nsdb_create_table(sqlite3 *db, const char *table_name, const char *table_def)
 		xlog(D_CALL, "Table %s already exists", table_name);
 		return true;
 	default:
-		xlog(D_GENERAL,
-			"%s: Failed to compile SQL while creating table %s: %s",
-			__func__, table_name, sqlite3_errmsg(db));
-		xlog(D_GENERAL, "%s: SQL: %s", __func__, sql);
+		xlog(L_ERROR, "Failed to compile SQL while creating table %s: %s",
+			table_name, sqlite3_errmsg(db));
+		xlog(L_ERROR, "SQL: %s");
 		return false;
 	}
 
 	rc = sqlite3_step(stmt);
 	if (rc != SQLITE_DONE) {
-		xlog(D_GENERAL, "%s: Failed to create %s table: %s",
-			__func__, table_name, sqlite3_errmsg(db));
+		xlog(L_ERROR, "Failed to create %s table: %s",
+			table_name, sqlite3_errmsg(db));
 		nsdb_finalize_stmt(stmt);
 		return false;
 	}

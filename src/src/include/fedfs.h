@@ -47,11 +47,6 @@
 #define FEDFS_DATABASE_FILE		"nsdbparam.sqlite3"
 
 /**
- * From draft-cel-nfsv4-federated-fs-security-addendum
- */
-#define FEDFS_ADMIN_GSS_SERVICE_NAME	"fedfs-admin"
-
-/**
  * Initial number of seconds to wait after receiving FEDFS_ERR_DELAY
  */
 #define FEDFS_DELAY_MIN_SECS	2

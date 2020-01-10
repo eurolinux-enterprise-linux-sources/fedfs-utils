@@ -250,6 +250,7 @@ main(int argc, char **argv)
 	unsigned short nsdbport;
 	struct fedfs_fsl *fsls;
 	struct fedfs_fsn *fsn;
+	unsigned int ldap_err;
 	char *nce, *fsn_uuid;
 	FedFsStatus retval;
 	int fsn_ttl, arg;
@@ -292,11 +293,10 @@ main(int argc, char **argv)
 				nsdb_resolve_fsn_usage(progname);
 			}
 			break;
-		case '?':
-			nsdb_resolve_fsn_usage(progname);
 		default:
 			fprintf(stderr, "Invalid command line "
 				"argument: %c\n", (char)arg);
+		case '?':
 			nsdb_resolve_fsn_usage(progname);
 		}
 	}
@@ -335,7 +335,7 @@ main(int argc, char **argv)
 	}
 
 again:
-	retval = nsdb_open_nsdb(host, NULL, NULL);
+	retval = nsdb_open_nsdb(host, NULL, NULL, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		break;
@@ -349,7 +349,7 @@ again:
 		goto out_free;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
 		fprintf(stderr, "Failed to bind to NSDB %s:%u: %s\n",
-			nsdbname, nsdbport, nsdb_ldaperr2string(host));
+			nsdbname, nsdbport, ldap_err2string(ldap_err));
 		goto out_free;
 	default:
 		fprintf(stderr, "Failed to open NSDB %s:%u: %s\n",
@@ -358,7 +358,7 @@ again:
 		goto out_free;
 	}
 
-	retval = nsdb_get_fsn_s(host, nce, fsn_uuid, &fsn);
+	retval = nsdb_get_fsn_s(host, nce, fsn_uuid, &fsn, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		fsn_ttl = fsn->fn_fsnttl;
@@ -375,7 +375,7 @@ again:
 		fprintf(stderr, "Failed to find FSN %s\n", fsn_uuid);
 		goto out_close;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
-		switch (nsdb_ldaperr(host)) {
+		switch (ldap_err) {
 		case LDAP_REFERRAL:
 			retval = nsdb_resolve_fsn_follow_ldap_referral(&host);
 			if (retval == FEDFS_OK)
@@ -387,7 +387,7 @@ again:
 			break;
 		default:
 			fprintf(stderr, "NSDB LDAP error: %s\n",
-				nsdb_ldaperr2string(host));
+				ldap_err2string(ldap_err));
 		}
 		goto out_close;
 	default:
@@ -397,7 +397,7 @@ again:
 		goto out_close;
 	}
 
-	retval = nsdb_resolve_fsn_s(host, nce, fsn_uuid, &fsls);
+	retval = nsdb_resolve_fsn_s(host, nce, fsn_uuid, &fsls, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		printf("For FSN UUID: %s\n", fsn_uuid);
@@ -421,14 +421,14 @@ again:
 		fprintf(stderr, "Failed to find FSN %s\n", fsn_uuid);
 		break;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
-		if (nsdb_ldaperr(host) == LDAP_REFERRAL) {
+		if (ldap_err == LDAP_REFERRAL) {
 			retval = nsdb_resolve_fsn_follow_ldap_referral(&host);
 			if (retval != FEDFS_OK)
 				break;
 			goto again;
 		}
 		fprintf(stderr, "NSDB LDAP error: %s\n",
-			nsdb_ldaperr2string(host));
+			ldap_err2string(ldap_err));
 		break;
 	default:
 		fprintf(stderr, "FedFsStatus code "

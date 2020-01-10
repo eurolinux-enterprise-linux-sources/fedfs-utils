@@ -26,34 +26,18 @@
 #ifndef _FEDFSD_H_
 #define _FEDFSD_H_
 
-#include <sys/types.h>
-
-#include <stdbool.h>
 #include <time.h>
 #include <ldap.h>
 #include <sqlite3.h>
 
-#include <rpc/svc.h>
-
 #include "fedfs_admin.h"
 
-#define FEDFSD_ACCESS_CONFIG	"/etc/fedfsd/access.conf"
-
 /*
- * auth.c
+ * junction.c
  */
-_Bool		fedfsd_read_access_config(const char *pathname);
-
-_Bool		fedfsd_auth_none(void);
-_Bool		fedfsd_auth_unix(struct svc_req *rqstp);
-_Bool		fedfsd_auth_rpc_gss(struct svc_req *rqstp);
-
-/*
- * gss.c
- */
-extern bool_t	fedfsd_no_dispatch;
-_Bool		fedfsd_set_up_authenticators(void);
-char *		fedfsd_get_gss_cred(struct svc_req *rqstp);
+FedFsStatus	fedfsd_create_junction(const char *pathname,
+				const char *uuid, const nsdb_t host);
+FedFsStatus	fedfsd_delete_junction(const char *pathname);
 
 /*
  * listen.c
@@ -73,4 +57,4 @@ _Bool		fedfsd_drop_privileges(const uid_t uid, const gid_t gid);
  */
 void		fedfsd_dispatch_1(struct svc_req *rqstp, SVCXPRT *xprt);
 
-#endif	/* !_FEDFSD_H_ */
+#endif	/* !_FEDFSD_ */

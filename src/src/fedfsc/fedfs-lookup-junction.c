@@ -4,7 +4,7 @@
  */
 
 /*
- * Copyright 2010, 2013 Oracle.  All rights reserved.
+ * Copyright 2010 Oracle.  All rights reserved.
  *
  * This file is part of fedfs-utils.
  *
@@ -27,27 +27,32 @@
 #include <sys/stat.h>
 
 #include <stdbool.h>
-#include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
 #include <getopt.h>
 #include <locale.h>
 
+#include <rpc/clnt.h>
+#include <uuid/uuid.h>
 #include <ldap.h>
 
 #include "fedfs.h"
 #include "fedfs_admin.h"
-#include "admin.h"
 #include "nsdb.h"
 #include "junction.h"
 #include "xlog.h"
 #include "gpl-boiler.h"
 
 /**
+ * Default RPC request timeout
+ */
+static struct timeval fedfs_lookup_junction_timeout = { 25, 0 };
+
+/**
  * Short form command line options
  */
-static const char fedfs_lookup_junction_opts[] = "?dh:n:t:s:";
+static const char fedfs_lookup_junction_opts[] = "?dh:n:t:";
 
 /**
  * Long form command line options
@@ -58,7 +63,6 @@ static const struct option fedfs_lookup_junction_longopts[] = {
 	{ "hostname", 1, NULL, 'h', },
 	{ "nettype", 1, NULL, 'n', },
 	{ "resolvetype", 1, NULL, 't', },
-	{ "security", 1, NULL, 's', },
 	{ NULL, 0, NULL, 0, },
 };
 
@@ -66,9 +70,8 @@ static const struct option fedfs_lookup_junction_longopts[] = {
  * Display program synopsis
  *
  * @param progname NUL-terminated C string containing name of program
- * @return program exit status
  */
-static int
+static void
 fedfs_lookup_junction_usage(const char *progname)
 {
 	fprintf(stderr, "\n%s version " VERSION "\n", progname);
@@ -80,11 +83,128 @@ fedfs_lookup_junction_usage(const char *progname)
 	fprintf(stderr, "\t-n, --nettype        RPC transport (default: 'netpath')\n");
 	fprintf(stderr, "\t-h, --hostname       ADMIN server hostname (default: 'localhost')\n");
 	fprintf(stderr, "\t-t, --resolvetype    Type of desired result (default: 'none')\n");
-	fprintf(stderr, "\t-s, --security       RPC security level\n");
 
 	fprintf(stderr, "%s", fedfs_gpl_boilerplate);
 
-	return EXIT_FAILURE;
+	exit((int)FEDFS_ERR_INVAL);
+}
+
+/**
+ * Parse name of resolvetype to resolvetype number
+ *
+ * @param resolvetype NUL-terminated C string containing name of requested resolvetype
+ * @param resolve OUT: resolvetype number
+ * @return true if "resolvetype" is a valid resolvetype
+ */
+static _Bool
+fedfs_lookup_junction_get_resolvetype(const char *resolvetype, FedFsResolveType *resolve)
+{
+	if (strcmp(resolvetype, "0") == 0 ||
+	    strcasecmp(resolvetype, "none") == 0 ||
+	    strcasecmp(resolvetype, "fedfs_resolve_none") == 0) {
+		*resolve = FEDFS_RESOLVE_NONE;
+		return true;
+	}
+	if (strcmp(resolvetype, "1") == 0 ||
+	    strcasecmp(resolvetype, "cache") == 0 ||
+	    strcasecmp(resolvetype, "fedfs_resolve_cache") == 0) {
+		*resolve = FEDFS_RESOLVE_CACHE;
+		return true;
+	}
+	if (strcmp(resolvetype, "2") == 0 ||
+	    strcasecmp(resolvetype, "nsdb") == 0 ||
+	    strcasecmp(resolvetype, "fedfs_resolve_nsdb") == 0) {
+		*resolve = FEDFS_RESOLVE_NSDB;
+		return true;
+	}
+	return false;
+}
+
+/**
+ * Display FSN UUID information in a FEDFS_LOOKUP_JUNCTION result
+ *
+ * @param pre_text NUL-terminated C string containing prefix to display
+ * @param uuid UUID to display
+ */
+static void
+fedfs_lookup_junction_print_uuid(const char *pre_text, const FedFsUuid uuid)
+{
+	char buf[FEDFS_UUID_STRLEN];
+	uuid_t uu;
+
+	memcpy(uu, uuid, sizeof(uu));
+	uuid_unparse(uu, buf);
+	printf("%s: %s\n", pre_text, buf);
+}
+
+/**
+ * Display FSN NSDB information in a FEDFS_LOOKUP_JUNCTION result
+ *
+ * @param pre_text NUL-terminated C string containing prefix to display
+ * @param nsdbname NSDB information to display
+ */
+static void
+fedfs_lookup_junction_print_nsdbname(const char *pre_text,
+		const FedFsNsdbName nsdbname)
+{
+	if (nsdbname.hostname.utf8string_val == NULL) {
+		printf("%s: NSDB name was empty\n", pre_text);
+		return;
+	}
+	printf("%s: %.*s:%u\n", pre_text,
+		nsdbname.hostname.utf8string_len,
+		nsdbname.hostname.utf8string_val,
+		nsdbname.port);
+}
+
+/**
+ * Display FSN information in a FEDFS_LOOKUP_JUNCTION result
+ *
+ * @param fsn FSN information to display
+ */
+static void
+fedfs_lookup_junction_print_fsn(const FedFsFsn fsn)
+{
+	fedfs_lookup_junction_print_uuid("FSN UUID", fsn.fsnUuid);
+	fedfs_lookup_junction_print_nsdbname("NSDB", fsn.nsdbName);
+}
+
+/**
+ * Display one NFS FSL in a FEDFS_LOOKUP_JUNCTION result
+ *
+ * @param fsl FSL record to display
+ */
+static void
+fedfs_lookup_junction_print_nfs_fsl(FedFsNfsFsl fsl)
+{
+	FedFsStatus status;
+	char **path_array;
+	unsigned int i;
+
+	fedfs_lookup_junction_print_uuid(" FSL UUID", fsl.fslUuid);
+	if (fsl.hostname.utf8string_val == NULL)
+		printf(" FSL hostname: empty\n");
+	else
+		printf(" FSL hostname: %.*s:%u\n",
+			fsl.hostname.utf8string_len,
+			fsl.hostname.utf8string_val,
+			fsl.port);
+	status = nsdb_fedfspathname_to_path_array(fsl.path, &path_array);
+	if (status != FEDFS_OK)
+		printf(" Returned NFS export pathname was invalid: %s\n",
+			nsdb_display_fedfsstatus(status));
+	else {
+		if (path_array[0] == NULL)
+			printf(" FSL NFS pathname: /\n");
+		else {
+			printf(" FSL NFS pathname: ");
+			for (i = 0; path_array[i] != NULL; i++)
+				printf("/%s", path_array[i]);
+			printf("\n");
+		}
+
+		nsdb_free_string_array(path_array);
+	}
 }
 
 /**
@@ -93,159 +213,138 @@ fedfs_lookup_junction_usage(const char *progname)
  * @param fsl FSL record to display
  */
 static void
-fedfs_lookup_junction_print_fsl(struct admin_fsl *fsl)
+fedfs_lookup_junction_print_fsl(FedFsFsl fsl)
+{
+	switch (fsl.type) {
+	case FEDFS_NFS_FSL:
+		fedfs_lookup_junction_print_nfs_fsl(fsl.FedFsFsl_u. nfsFsl);
+		break;
+	default:
+		printf(" Unsupported FSL type\n");
+	}
+}
+
+/**
+ * Display results of a successful FEDFS_LOOKUP_JUNCTION request
+ *
+ * @param result results to display
+ */
+static void
+fedfs_lookup_junction_print_resok(FedFsLookupResOk result)
 {
 	unsigned int i;
 
-	printf(" FSL UUID: %s\n", fsl->al_uuid);
+	fedfs_lookup_junction_print_fsn(result.fsn);
 
-	printf(" FSL hostname: %s:%u\n",
-		fsl->al_hostname, fsl->al_port);
-
-	if (fsl->al_pathname[0] == NULL)
-		printf(" FSL NFS pathname: /\n");
-	else {
-		printf(" FSL NFS pathname: ");
-		for (i = 0; fsl->al_pathname[i] != NULL; i++)
-			printf("/%s", fsl->al_pathname[i]);
-		printf("\n");
-	}
-}
-
-/**
- * Display FSLs returned by a FEDFS_LOOKUP_JUNCTION request
- *
- * @param fsl list of FSLs returned from the server
- */
-static void
-fedfs_lookup_junction_print_fsls(struct admin_fsl *fsl)
-{
-	if (fsl == NULL)
+	if (result.fsl.fsl_len == 0)
 		return;
 
 	printf("Returned FSLs:\n");
-	while (fsl != NULL) {
-		fedfs_lookup_junction_print_fsl(fsl);
-		fsl = fsl->al_next;
-	}
+	for (i = 0; i < result.fsl.fsl_len; i++)
+		fedfs_lookup_junction_print_fsl(result.fsl.fsl_val[i]);
 }
 
 /**
- * Look up a junction on a remote fileserver
+ * Display results of FEDFS_LOOKUP_JUNCTION when an LDAP/NSDB failure is reported
  *
- * @param host an initialized and opened admin_t
- * @param path_array an array of NUL-terminated C strings containing pathname components
- * @param request requested resolution type
- * @return program exit status
+ * @param result results to display
  */
-static FedFsStatus
-fedfs_lookup_junction_try(admin_t host, char * const *path_array, int request)
+static void
+fedfs_lookup_junction_print_ldapresultcode(FedFsLookupRes result)
 {
-	struct admin_fsl *fsls = NULL;
-	struct admin_fsn *fsn = NULL;
-	int status, err;
+	int ldap_err = result.FedFsLookupRes_u.ldapResultCode;
 
-	status = EXIT_FAILURE;
-	switch (request) {
-	case 0:
-		err = admin_lookup_junction_none(host, path_array, &fsn);
-		break;
-	case 1:
-		err = admin_lookup_junction_cached(host, path_array,
-								&fsn, &fsls);
-		break;
-	case 2:
-		err = admin_lookup_junction_nsdb(host, path_array,
-								&fsn, &fsls);
-		break;
-	default:
-		xlog(L_ERROR, "Unrecognized request");
-		goto out;
-	}
+	fprintf(stderr, "LDAP result code (%d): %s\n",
+		ldap_err, ldap_err2string(ldap_err));
+}
 
-	switch (err) {
-	case 0:
-		break;
-	case EACCES:
-		xlog(L_ERROR, "%s: access denied", admin_hostname(host));
-		xlog(D_GENERAL, "%s",
-			admin_perror(host, admin_hostname(host)));
-		goto out;
-	case EIO:
-		xlog(L_ERROR, "%s",
-			admin_perror(host, admin_hostname(host)));
-		goto out;
-	default:
-		xlog(L_ERROR, "ADMIN client: %s", strerror(err));
-		goto out;
-	}
-
-	switch (admin_status(host)) {
+/**
+ * Display results of FEDFS_LOOKUP_JUNCTION request
+ *
+ * @param result results to display
+ */
+static void
+fedfs_lookup_junction_print_result(FedFsLookupRes result)
+{
+	nsdb_print_fedfsstatus(result.status);
+	switch (result.status) {
 	case FEDFS_OK:
-		printf("FSN UUID: %s\n", fsn->af_uuid);
-		printf("NSDB: %s:%u\n",
-			fsn->af_nsdb.an_hostname,
-			fsn->af_nsdb.an_port);
-		if (request > 0)
-			fedfs_lookup_junction_print_fsls(fsls);
-		status = EXIT_SUCCESS;
+		fedfs_lookup_junction_print_resok(result.FedFsLookupRes_u.resok);
 		break;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
-		fprintf(stderr, "LDAP result code (%d): %s\n",
-			admin_ldaperr(host),
-			ldap_err2string(admin_ldaperr(host)));
-		break;
-	case FEDFS_ERR_NSDB_PARAMS:
-		printf("No connection parameters found\n");
+		fedfs_lookup_junction_print_ldapresultcode(result);
 		break;
 	default:
-		nsdb_print_fedfsstatus(admin_status(host));
+		break;
 	}
-	admin_free_fsls(fsls);
-	admin_free_fsn(fsn);
-
-out:
-	return status;
 }
 
 /**
- * Look up a junction on a remote fileserver
+ * Request a remote fileserver to resolve a junction
  *
  * @param hostname NUL-terminated UTF-8 string containing ADMIN server's hostname
  * @param nettype NUL-terminated C string containing nettype to use for connection
- * @param security NUL-terminated C string containing RPC security mode
- * @param path_array an array of NUL-terminated C strings containing pathname components
- * @param request requested resolution type
- * @return program exit status
+ * @param path NUL-terminated C string containing remote pathname of junction to resolve
+ * @param resolvetype NUL-terminated C string containing name of requested resolvetype
+ * @return a FedFsStatus code
  */
-static int
-fedfs_lookup_junction_host(const char *hostname, const char *nettype,
-		const char *security, char * const *path_array, int request)
+static FedFsStatus
+fedfs_lookup_junction_call(const char *hostname, const char *nettype,
+		const char *path, const char *resolvetype)
 {
-	admin_t host;
-	int status;
+	FedFsLookupRes result;
+	enum clnt_stat status;
+	FedFsLookupArgs arg;
+	char **path_array;
+	CLIENT *client;
 
-	status = EXIT_FAILURE;
-	switch (admin_create(hostname, nettype, security, &host)) {
-	case 0:
-		status = fedfs_lookup_junction_try(host, path_array, request);
-		admin_release(host);
-		break;
-	case EINVAL:
-		xlog(L_ERROR, "Invalid command line parameter");
-		break;
-	case EACCES:
-		xlog(L_ERROR, "Failed to authenticate server");
-		break;
-	case EKEYEXPIRED:
-		xlog(L_ERROR, "User credentials not found");
-		break;
-	default:
-		xlog(L_ERROR, "%s",
-			admin_open_perror(hostname));
+	memset(&arg, 0, sizeof(arg));
+
+	if (!fedfs_lookup_junction_get_resolvetype(resolvetype, &arg.resolve))
+		return FEDFS_ERR_INVAL;
+	arg.path.type = FEDFS_PATH_SYS;
+	result.status = nsdb_posix_to_path_array(path, &path_array);
+	if (result.status != FEDFS_OK) {
+		fprintf(stderr, "Failed to encode pathname: %s",
+			nsdb_display_fedfsstatus(result.status));
+		return result.status;
+	}
+	result.status = nsdb_path_array_to_fedfspathname(path_array,
+						&arg.path.FedFsPath_u.adminPath);
+	if (result.status != FEDFS_OK) {
+		fprintf(stderr, "Failed to encode pathname: %s",
+			nsdb_display_fedfsstatus(result.status));
+		nsdb_free_string_array(path_array);
+		return result.status;
 	}
 
-	return status;
+	client = clnt_create(hostname, FEDFS_PROG, FEDFS_V1, nettype);
+	if (client == NULL) {
+		clnt_pcreateerror("Failed to create FEDFS client");
+		result.status = FEDFS_ERR_SVRFAULT;
+		goto out;
+	}
+
+	memset((char *)&result, 0, sizeof(result));
+	status = clnt_call(client, FEDFS_LOOKUP_JUNCTION,
+				(xdrproc_t)xdr_FedFsLookupArgs, (caddr_t)&arg,
+				(xdrproc_t)xdr_FedFsLookupRes, (caddr_t)&result,
+				fedfs_lookup_junction_timeout);
+	if (status != RPC_SUCCESS) {
+		clnt_perror(client, "FEDFS_LOOKUP_JUNCTION call failed");
+		result.status = FEDFS_ERR_SVRFAULT;
+	} else {
+		fedfs_lookup_junction_print_result(result);
+		clnt_freeres(client,
+			(xdrproc_t)xdr_FedFsLookupRes,
+			(caddr_t)&result);
+	}
+	(void)clnt_destroy(client);
+
+out:
+	nsdb_free_fedfspathname(&arg.path.FedFsPath_u.adminPath);
+	nsdb_free_string_array(path_array);
+	exit(result.status);
 }
 
 /**
@@ -258,10 +357,10 @@ fedfs_lookup_junction_host(const char *hostname, const char *nettype,
 int
 main(int argc, char **argv)
 {
-	char *progname, *hostname, *nettype, *path, *security, *resolvetype;
-	int arg, status, request;
-	FedFsStatus retval;
-	char **path_array;
+	char *progname, *hostname, *nettype, *path, *resolvetype;
+	unsigned int seconds;
+	FedFsStatus status;
+	int arg;
 
 	(void)setlocale(LC_ALL, "");
 	(void)umask(S_IRWXO);
@@ -279,7 +378,6 @@ main(int argc, char **argv)
 
 	hostname = "localhost";
 	nettype = "netpath";
-	security = "unix";
 	resolvetype = "none";
 	while ((arg = getopt_long(argc, argv, fedfs_lookup_junction_opts,
 				fedfs_lookup_junction_longopts, NULL)) != -1) {
@@ -293,55 +391,34 @@ main(int argc, char **argv)
 		case 'n':
 			nettype = optarg;
 			break;
-		case 's':
-			security = optarg;
-			break;
 		case 't':
 			resolvetype = optarg;
 			break;
 		default:
 			fprintf(stderr, "Invalid command line argument: %c\n", (char)arg);
 		case '?':
-			return fedfs_lookup_junction_usage(progname);
+			fedfs_lookup_junction_usage(progname);
 		}
 	}
 	if (argc == optind + 1)
 		path = argv[optind];
 	else if (argc > optind + 1) {
 		fprintf(stderr, "Unrecognized positional parameters\n");
-		return fedfs_lookup_junction_usage(progname);
+		fedfs_lookup_junction_usage(progname);
 	} else {
 		fprintf(stderr, "No junction pathname was specified\n");
-		return fedfs_lookup_junction_usage(progname);
+		fedfs_lookup_junction_usage(progname);
 	}
 
-	if (strcmp(resolvetype, "0") == 0 ||
-	    strcasecmp(resolvetype, "none") == 0 ||
-	    strcasecmp(resolvetype, "fedfs_resolve_none") == 0)
-		request = 0;
-	else if (strcmp(resolvetype, "1") == 0 ||
-	    strcasecmp(resolvetype, "cache") == 0 ||
-	    strcasecmp(resolvetype, "fedfs_resolve_cache") == 0)
-		request = 1;
-	else if (strcmp(resolvetype, "2") == 0 ||
-	    strcasecmp(resolvetype, "nsdb") == 0 ||
-	    strcasecmp(resolvetype, "fedfs_resolve_nsdb") == 0)
-		request = 2;
-	else {
-		fprintf(stderr, "Unrecognized resolvetype\n");
-		return EXIT_FAILURE;
+	for (seconds = FEDFS_DELAY_MIN_SECS;; seconds = fedfs_delay(seconds)) {
+		status = fedfs_lookup_junction_call(hostname, nettype,
+						path, resolvetype);
+		if (status != FEDFS_ERR_DELAY)
+			break;
+
+		xlog(D_GENERAL, "Delaying %u seconds...", seconds);
+		if (sleep(seconds) != 0)
+			break;
 	}
-
-	retval = nsdb_posix_to_path_array(path, &path_array);
-	if (retval != FEDFS_OK) {
-		fprintf(stderr, "Failed to encode pathname: %s",
-			nsdb_display_fedfsstatus(retval));
-		return EXIT_FAILURE;
-	}
-
-	status = fedfs_lookup_junction_host(hostname, nettype,
-						security, path_array, request);
-
-	nsdb_free_string_array(path_array);
-	return status;
+	return (int)status;
 }

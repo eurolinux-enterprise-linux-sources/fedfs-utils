@@ -206,10 +206,10 @@ insert_srvinfo_sorted(struct srvinfo **head, struct srvinfo *entry)
 int
 getsrvinfo(const char *srvname, const char *domainname, struct srvinfo **si)
 {
-	unsigned char *msg, *eom, *comp_dn;
+	unsigned char *msg, *comp_dn;
 	struct srvinfo *results;
-	unsigned short count, i;
-	int status, len;
+	unsigned short count;
+	int status, i, len;
 	char *exp_dn;
 	HEADER *hdr;
 
@@ -250,10 +250,9 @@ getsrvinfo(const char *srvname, const char *domainname, struct srvinfo **si)
 		status = ESI_NODATA;
 		goto out;
 	}
-	eom = msg + len;
 
 	comp_dn = &msg[HFIXEDSZ];
-	comp_dn += dn_skipname(comp_dn, eom) + QFIXEDSZ;
+	comp_dn += dn_skipname(comp_dn, msg + len) + QFIXEDSZ;
 
 	results = NULL;
 	for (i = 0; i < count; i++) {
@@ -261,22 +260,21 @@ getsrvinfo(const char *srvname, const char *domainname, struct srvinfo **si)
 		struct srv *record;
 		int l;
 
-		l = dn_expand(msg, eom, comp_dn, exp_dn, NS_MAXDNAME);
+		l = dn_expand(msg, msg + len, comp_dn, exp_dn, NS_MAXDNAME);
 		if (l == -1) {
 			status = ESI_PARSE;
 			goto out_free;
 		}
+
 		comp_dn += l;
 
 		record = (struct srv *)&comp_dn[10];
-		comp_dn += 16;
 
-		l = dn_expand(msg, eom, comp_dn, exp_dn, NS_MAXDNAME);
+		l = dn_expand(msg, msg + len, comp_dn + 16, exp_dn, NS_MAXDNAME);
 		if (l == -1) {
 			status = ESI_PARSE;
 			goto out_free;
 		}
-		comp_dn += l;
 
 		if (count == 1 && strcmp(exp_dn, ".") == 0) {
 			status = ESI_SERVICE;

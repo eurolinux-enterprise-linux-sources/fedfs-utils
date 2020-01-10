@@ -114,11 +114,12 @@ static void
 nsdb_list_resolve_and_display_fsn(nsdb_t host, const char *nce, const char *fsn_uuid)
 {
 	struct fedfs_fsl *fsls;
+	unsigned int ldap_err;
 	FedFsStatus retval;
 
 	printf("    FSN UUID: %s\n", fsn_uuid);
 
-	retval = nsdb_resolve_fsn_s(host, nce, fsn_uuid, &fsls);
+	retval = nsdb_resolve_fsn_s(host, nce, fsn_uuid, &fsls, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		nsdb_list_display_fsls(fsls);
@@ -129,7 +130,7 @@ nsdb_list_resolve_and_display_fsn(nsdb_t host, const char *nce, const char *fsn_
 		break;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
 		fprintf(stderr, "NSDB LDAP error: %s\n",
-			nsdb_ldaperr2string(host));
+			ldap_err2string(ldap_err));
 		break;
 	default:
 		fprintf(stderr, "Failed to resolve FSN UUID %s: %s\n",
@@ -144,16 +145,17 @@ nsdb_list_resolve_and_display_fsn(nsdb_t host, const char *nce, const char *fsn_
  *
  * @param host an initialized and bound nsdb_t object
  * @param nce a NUL-terminated C string containing DN of NSDB container entry
+ * @param ldap_err OUT: possibly an LDAP error code
  * @return a FedFsStatus code
  */
 static FedFsStatus
-nsdb_list_display_one_nce(nsdb_t host, const char *nce)
+nsdb_list_display_one_nce(nsdb_t host, const char *nce, unsigned int *ldap_err)
 {
 	FedFsStatus retval;
 	char **fsns;
 	int i;
 
-	retval = nsdb_list_s(host, nce, &fsns);
+	retval = nsdb_list_s(host, nce, &fsns, ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		printf("  NCE: %s\n\n", nce);
@@ -181,13 +183,14 @@ nsdb_list_display_one_nce(nsdb_t host, const char *nce)
  *
  * @param host an initialized and bound nsdb_t object
  * @param nce a NUL-terminated C string containing DN of NSDB container entry
+ * @param ldap_err OUT: possibly an LDAP error code
  * @return a FedFsStatus code
  */
 static FedFsStatus
-nsdb_list_display_nce(nsdb_t host, const char *nce)
+nsdb_list_display_nce(nsdb_t host, const char *nce, unsigned int *ldap_err)
 {
 	printf("NSDB: %s:%u\n\n", nsdb_hostname(host), nsdb_port(host));
-	return nsdb_list_display_one_nce(host, nce);
+	return nsdb_list_display_one_nce(host, nce, ldap_err);
 
 }
 
@@ -195,16 +198,17 @@ nsdb_list_display_nce(nsdb_t host, const char *nce)
  * Display FSNs under all NCEs, with header
  *
  * @param host an initialized and bound nsdb_t object
+ * @param ldap_err OUT: possibly an LDAP error code
  * @return a FedFsStatus code
  */
 static FedFsStatus
-nsdb_list_display_all_nces(nsdb_t host)
+nsdb_list_display_all_nces(nsdb_t host, unsigned int *ldap_err)
 {
-	char *dn, **contexts;
 	FedFsStatus retval;
+	char *dn, **contexts;
 	int i;
 
-	retval = nsdb_get_naming_contexts_s(host, &contexts);
+	retval = nsdb_get_naming_contexts_s(host, &contexts, ldap_err);
 	if (retval != FEDFS_OK)
 		return retval;
 
@@ -212,9 +216,9 @@ nsdb_list_display_all_nces(nsdb_t host)
 
 	retval = FEDFS_ERR_NSDB_NONCE;
 	for (i = 0; contexts[i] != NULL; i++) {
-		retval = nsdb_get_ncedn_s(host, contexts[i], &dn);
+		retval = nsdb_get_ncedn_s(host, contexts[i], &dn, ldap_err);
 		if (retval == FEDFS_OK) {
-			retval = nsdb_list_display_one_nce(host, dn);
+			retval = nsdb_list_display_one_nce(host, dn, ldap_err);
 			free(dn);
 			if (retval != FEDFS_OK)
 				break;
@@ -283,6 +287,7 @@ main(int argc, char **argv)
 {
 	char *progname, *nsdbname;
 	unsigned short nsdbport;
+	unsigned int ldap_err;
 	FedFsStatus retval;
 	nsdb_t host;
 	char *nce;
@@ -324,11 +329,10 @@ main(int argc, char **argv)
 				nsdb_list_usage(progname);
 			}
 			break;
-		case '?':
-			nsdb_list_usage(progname);
 		default:
 			fprintf(stderr, "Invalid command line "
 				"argument: %c\n", (char)arg);
+		case '?':
 			nsdb_list_usage(progname);
 		}
 	}
@@ -357,7 +361,7 @@ main(int argc, char **argv)
 	}
 
 again:
-	retval = nsdb_open_nsdb(host, NULL, NULL);
+	retval = nsdb_open_nsdb(host, NULL, NULL, &ldap_err);
 	switch (retval) {
 	case FEDFS_OK:
 		break;
@@ -371,7 +375,7 @@ again:
 		goto out_free;
 	case FEDFS_ERR_NSDB_LDAP_VAL:
 		fprintf(stderr, "Failed to bind to NSDB %s:%u: %s\n",
-			nsdbname, nsdbport, nsdb_ldaperr2string(host));
+			nsdbname, nsdbport, ldap_err2string(ldap_err));
 		goto out_free;
 	default:
 		fprintf(stderr, "Failed to open NSDB %s:%u: %s\n",
@@ -381,11 +385,11 @@ again:
 	}
 
 	if (nce != NULL)
-		retval = nsdb_list_display_nce(host, nce);
+		retval = nsdb_list_display_nce(host, nce, &ldap_err);
 	else
-		retval = nsdb_list_display_all_nces(host);
+		retval = nsdb_list_display_all_nces(host, &ldap_err);
 	if (retval == FEDFS_ERR_NSDB_LDAP_VAL) {
-		switch (nsdb_ldaperr(host)) {
+		switch (ldap_err) {
 		case LDAP_REFERRAL:
 			retval = nsdb_list_follow_ldap_referral(&host);
 			if (retval == FEDFS_OK)
@@ -397,7 +401,7 @@ again:
 			break;
 		default:
 			fprintf(stderr, "Failed to list FSNs: %s\n",
-				nsdb_ldaperr2string(host));
+				ldap_err2string(ldap_err));
 		}
 	}
 
